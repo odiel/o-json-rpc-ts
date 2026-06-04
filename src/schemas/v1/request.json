@@ -1,0 +1,239 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$defs": {
+        "procedureInput": {
+            "anyOf": [
+                {
+                    "type": "boolean"
+                },
+                {
+                    "type": "number"
+                },
+                {
+                    "type": "string"
+                },
+                {
+                    "type": "object"
+                },
+                {
+                    "type": "null"
+                }
+            ]
+        },
+        "procedure": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "description": "Unique identifier for the procedure execution.",
+                    "type": "string",
+                    "maxLength": 128,
+                    "pattern": "^[a-zA-Z0-9-_.]+$"
+                },
+                "name": {
+                    "type": "string",
+                    "maxLength": 128,
+                    "pattern": "^[a-zA-Z]{1}[a-zA-Z0-9_]+$"
+                },
+                "input": {
+                    "$ref": "#/$defs/procedureInput"
+                }
+            },
+            "required": [
+                "id",
+                "name"
+            ],
+            "additionalProperties": false
+        },
+        "options": {
+            "type": "object",
+            "properties": {
+                "request_id": {
+                    "type": "string",
+                    "maxLength": 128,
+                    "pattern": "^[a-zA-Z0-9-_.]+$"
+                },
+                "execution": {
+                    "$ref": "#/$defs/requestOptionExecution"
+                },
+                "authentication": {
+                    "$ref": "#/$defs/requestOptionAuthentication"
+                },
+                "return": {
+                    "$ref": "#/$defs/requestOptionReturn"
+                }
+            }
+        },
+        "requestOptionExecution": {
+            "type": "object",
+            "properties": {
+                "strategy": {
+                    "enum": [
+                        "sequential",
+                        "parallel"
+                    ]
+                },
+                "procedure_timeout": {
+                    "type": "number"
+                }
+            },
+            "additionalProperties": false
+        },
+        "requestOptionAuthentication": {
+            "oneOf": [
+                {
+                    "type": "object",
+                    "properties": {
+                        "scheme": {
+                            "const": "session"
+                        },
+                        "token": {
+                            "type": "string",
+                            "maxLength": 256
+                        },
+                        "token_type": {
+                            "type": "string",
+                            "enum": ["plain-text", "base64"]
+                        }
+                    },
+                    "required": [
+                        "scheme",
+                        "token",
+                        "token_type"
+                    ],
+                    "additionalProperties": false
+                },
+                {
+                    "type": "object",
+                    "properties": {
+                        "scheme": {
+                            "const": "api_key"
+                        },
+                        "token": {
+                            "type": "string",
+                            "maxLength": 256
+                        },
+                        "token_type": {
+                            "type": "string",
+                            "enum": ["plain-text", "base64"]
+                        }
+                    },
+                    "required": [
+                        "scheme",
+                        "token",
+                        "token_type"
+                    ],
+                    "additionalProperties": false
+                },
+                {
+                    "type": "object",
+                    "properties": {
+                        "scheme": {
+                            "type": "string",
+                            "enum": ["access_token", "refresh_token"]
+                        },
+                        "token": {
+                            "type": "string",
+                            "maxLength": 256
+                        },
+                        "token_type": {
+                            "type": "string",
+                            "enum": ["jwt"]
+                        }
+                    },
+                    "required": [
+                        "scheme",
+                        "token",
+                        "token_type"
+                    ],
+                    "additionalProperties": false
+                },
+                {
+                    "type": "object",
+                    "properties": {
+                        "scheme": {
+                            "const": "identity_provider"
+                        },
+                        "token": {
+                            "type": "string",
+                            "maxLength": 256
+                        },
+                        "token_type": {
+                            "type": "string",
+                            "maxLength": 128,
+                            "pattern": "^[a-zA-Z0-9-_.]+$"
+                        },
+                        "provider": {
+                            "type": "string",
+                            "maxLength": 128
+                        }
+                    },
+                    "required": [
+                        "scheme",
+                        "token",
+                        "token_type"
+                    ],
+                    "additionalProperties": false
+                }
+            ]
+        },
+        "requestOptionReturn": {
+            "type": "array",
+            "items": {
+                "type": "string",
+                "enum": [
+                    "request_id",
+                    "request_execution_time",
+                    "procedures_execution_details"
+                ]
+            },
+            "minItems": 1,
+            "uniqueItems": true,
+            "additionalProperties": false
+        }
+    },
+    "type": "object",
+    "properties": {
+        "protocol": {
+            "description": "Protocol version.",
+            "const": "v1"
+        },
+        "api": {
+            "description": "API version.",
+            "type": "string",
+            "maxLength": 128,
+            "pattern": "^[a-zA-Z0-9-_.\/]+$"
+        },
+        "procedures": {
+            "description": "Collection of procedures to execute.",
+            "type": "array",
+            "items": {
+                "$ref": "#/$defs/procedure"
+            }
+        },
+        "subscriptions": {
+            "description": "Collection of resources to subscribe.",
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "resource_name": {
+                        "description": "Name of the resource to subscribe",
+                        "type": "string",
+                        "maxLength": 128,
+                        "pattern": "^[a-zA-Z]{1}[a-zA-Z0-9_]+$"
+                    }
+                },
+                "required": ["resource_name"]
+            }
+        },
+        "options": {
+            "description": "Set of configurable options to provide additional information for the request.",
+            "$ref": "#/$defs/options"
+        }
+    },
+    "required": [
+        "protocol",
+        "api"
+    ],
+    "additionalProperties": false
+}

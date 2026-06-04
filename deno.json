@@ -1,0 +1,30 @@
+{
+    "name": "@o-json-rpc/o-json-rpc-ts",
+    "version": "1.0.12",
+    "license": "MIT",
+    "exports": "./src/index.ts",
+    "tasks": {
+        "b": "deno run --check --allow-net ./src/index.ts",
+        "l": "deno lint",
+        "f": "deno fmt",
+        "fl": "deno fmt && deno lint",
+        "tests": "deno test --allow-net --trace-leaks --coverage",
+        "coverage": "deno task tests && deno coverage --html --exclude=\"src/clients\" --exclude=\"tests\""
+    },
+    "imports": {
+        "@std/assert": "jsr:@std/assert@1",
+        "@std/fs": "jsr:@std/fs@^1.0.19",
+        "zod": "npm:zod@^4.1.4"
+    },
+    "fmt": {
+        "lineWidth": 200,
+        "indentWidth": 4,
+        "semiColons": true,
+        "singleQuote": true,
+        "proseWrap": "preserve",
+        "bracePosition": "sameLine",
+        "nextControlFlowPosition": "sameLine",
+        "operatorPosition": "sameLine",
+        "singleBodyPosition": "sameLine"
+    }
+}
