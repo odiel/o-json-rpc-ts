@@ -1,8 +1,8 @@
 import type { ZodType } from 'zod';
-import {
+import type {
     AbstractLogger,
     Api,
-    APIDefinition, InvalidZodDefinition,
+    APIDefinition,
     JSONSchema,
     ProcedureExecution,
     ProcedureHandlerFunction,
@@ -31,6 +31,7 @@ import {
     Environment,
     ExecutionStrategy,
     HttpMethod,
+    InvalidZodDefinition,
     JRPCError,
     LogLevel,
     ProcedureIncompatibleInput,
@@ -53,6 +54,9 @@ import { serializeError } from './utils.ts';
 
 const defaultProcedureTimeout = 3000;
 
+/**
+ * O-JSON-RPC Server side implementation.
+ */
 export class Server {
     private server?: Deno.HttpServer;
 
@@ -61,7 +65,7 @@ export class Server {
     private config: {
         host: string;
         port: number;
-        env: Environment;
+        env: Environment | string;
         cors: {
             accessControlAllowOrigin?: string;
         };
@@ -85,12 +89,12 @@ export class Server {
     };
 
     /**
-     * Registered resources per API
+     * Registered resources per API.
      */
     private resourceDefinitions = new Map<Api, Record<ResourceName, ZodType>>();
 
     /**
-     * Registered procedure handlers per API
+     * Registered procedure handlers per API.
      */
     private procedureHandlers = new Map<
         Api,
@@ -101,7 +105,7 @@ export class Server {
     >();
 
     /**
-     * Registered subscription handlers per API
+     * Registered subscription handlers per API.
      */
     private subscriptionHandlers = new Map<
         Api,
@@ -109,7 +113,7 @@ export class Server {
     >();
 
     /**
-     * List of websocket connections for a resource
+     * List of websocket connections for a combination of API and resource.
      */
     private resourceConnections = new Map<
         `${Api}:${ResourceName}`,
@@ -117,29 +121,29 @@ export class Server {
     >();
 
     /**
-     * List of connected websocket clients
+     * List of connected websocket clients.
      */
     private connectedWebsockets = new Map<string, ServerWebSocket>();
 
     /**
-     * CORS headers definition
+     * CORS headers definition.
      */
     private corsHeaders: Record<string, string>;
 
     /**
-     * Generated API definition
+     * Generated API definition.
      */
     private apiDefinition?: APIDefinition;
 
     /**
-     * Callback function to execute as first step of a request before processing any procedure
+     * Callback function to execute as first step of a request before processing any procedure.
      */
     private beforeAllFunc?: (
         context: RequestContext,
     ) => void | Promise<void>;
 
     /**
-     * Callback function to execute before processing each procedure
+     * Callback function to execute before processing each procedure.
      */
     private beforeEachFunc?: (
         context: RequestContext,
@@ -147,7 +151,7 @@ export class Server {
     ) => void | Promise<void>;
 
     /**
-     * Callback function to execute after processing each procedure
+     * Callback function to execute after processing each procedure.
      */
     private afterEachFunc?: (
         context: RequestContext,
@@ -156,14 +160,14 @@ export class Server {
     ) => void | Promise<void>;
 
     /**
-     * Callback function to execute after processing all procedures of a request
+     * Callback function to execute after processing all procedures of a request.
      */
     private afterAllFunc?: (
         context: RequestContext,
     ) => void | Promise<void>;
 
     /**
-     * Callback function to execute when an unhandled error occurs
+     * Callback function to execute when an unhandled error occurs.
      */
     private onErrorFunc?: (
         context: RequestContext,
@@ -171,11 +175,32 @@ export class Server {
         procedureContext?: ProcedureRequestContext,
     ) => JRPCError | Promise<JRPCError>;
 
+    /**
+     * Class constructor.
+     *
+     * @param configuration Object supporting different options to configure the server
+     * - host: defines which host the server starts listening for requests; server runs by default on `localhost`
+     * - port: which port should be used to listen for requests; 8000 by default
+     * - env: sets the environment value in which the server is running; dev is the environment by default
+     * - cors: CORS configuration to allow access to the server from client applications; access from all origins is allowed by default
+     * - logger: allows to pass a Logger instance; server uses a ConsoleLogger by default
+     * - request: options to configure some rules for handling requests
+     * - exposeDefinition: exposes the application definition on http://host:port/definition; default value is true
+     *
+     * Examples:
+     * ```ts
+     * const server = new Server({ host: 'localhost', port: 8080, env: Environment.PRODUCTION, exposeDefinition: false });
+     *
+     * const server = new Server({ logger: new MyCustomLogger() });
+     *
+     * const server = new Server({ request: { maxBodySizeBytes: 1024 }, cors: { accessControlAllowOrigin: 'mydomain.com' } });
+     * ```
+     */
     constructor(
         configuration?: {
             host?: string;
             port?: number;
-            env?: Environment;
+            env?: Environment | string;
             cors?: {
                 accessControlAllowOrigin?: string;
             };
@@ -229,12 +254,23 @@ export class Server {
     }
 
     /**
-     * Registers a resource for the API
+     * Registers a resource for an API.
      *
      * @param api API where the resource is registered
      * @param name Name to give to the resource
      * @param schema Zod schema to define the resource structure
+     *
      * @throws ServerInstanceError if the resource is already registered
+     *
+     * ```ts
+     * const zUser = z.object({
+     *     id: z.string(),
+     *     email: z.string()
+     * });
+     *
+     * const server = new Server();
+     * server.registerResource('v1', 'User', zUser);
+     * ```
      */
     public registerResource(api: Api, name: ResourceName, schema: ZodType): Server {
         if (!this.resourceDefinitions.get(api)) {
@@ -262,13 +298,21 @@ export class Server {
     }
 
     /**
-     * Registers a procedure handler for the API
+     * Registers a procedure handler for the API.
      *
      * @param api API where the procedure is registered
      * @param procedureName Procedure name; used when calling a procedure in a request
      * @param handler Function to execute when processing a procedure call
      * @param options Optional input and output resource names to validate both the input value incoming in the request and the output result the procedure returns
-     * @throws ServerInstanceError if either the input or output resources have are not previously registered or if the procedure is already registered
+     *
+     * @throws ServerInstanceError if either the input or output resources are not previously registered or if the procedure is already registered
+     *
+     * ```ts
+     * const server = new Server();
+     * server
+     *      .registerProcedure('v1', 'registerUser', registerUserProcedure, { input: 'UserCredentials', output: 'UserId' });
+     *      .registerProcedure('v1', 'getUser', getUserProcedure, { input: 'UserId', output: 'User' });
+     * ```
      */
     public registerProcedure(api: Api, procedureName: ProcedureName, handler: ProcedureHandlerFunction, options?: { input?: ResourceName; output?: ResourceName }): Server {
         let apiProcedures = this.procedureHandlers.get(api);
@@ -333,12 +377,42 @@ export class Server {
     }
 
     /**
-     * Registers a subscription for resource in an API
+     * Registers a subscription handler for a resource in an API.
      *
      * @param api API where the subscription is registered
      * @param resourceName Name of the resource to subscribe
-     * @param options
+     * @param options Hook helper functions for the subscription handler to manage client connects, disconnects and resource updates
+     * - onClientConnect: gets called when the server handles a connection from a client to the resourceName
+     * - onClientDisconnect: gets called when the registered connection disconnects
+     * - onResourceUpdate: gets called when a procedure internally calls `notifySubscribers`
+     *
      * @throws ServerInstanceError if either the resource is not previously registered or if there is subscription already registered for the same resource
+     *
+     * ```ts
+     * const zUser = z.object({
+     *     id: z.string(),
+     *     email: z.string()
+     * });
+     *
+     *  function onClientConnect(websocketId: WebSocketId, context: RequestContext) {
+     *      console.log(websocketId, context);
+     *  }
+     *
+     *  function onClientDisconnect(websocketId: WebSocketId, context: RequestContext) {
+     *     console.log(websocketId, context);
+     *  }
+     *
+     *  function onResourceUpdate(protocolVersion: ProtocolVersion, api: Api, name: ResourceName, resource: ResourceContent) {
+     *      console.log(protocolVersion, api, name, resource);
+     *  }
+     *
+     * const server = new Server();
+     * server
+     *      .registerResource('v1', 'User', zUser);
+     *      .registerProcedure('v1', 'registerUser', registerUserProcedure, { input: 'UserCredentials', output: 'UserId' });
+     *      .registerProcedure('v1', 'getUser', getUserProcedure, { input: 'UserId', output: 'User' });
+     *      .registerSubscription('v1, 'User', { onClientConnect, onClientDisconnect, onResourceUpdate })
+     * ```
      */
     public registerSubscription(
         api: Api,
@@ -391,7 +465,14 @@ export class Server {
     }
 
     /**
-     * Sets a callback function to be executed before running any procedure
+     * Sets a callback function to be executed before running any procedure.
+     *
+     * ```ts
+     * const server = new Server();
+     * server.beforeAll((context: RequestContext) => {
+     *      console.log(context);
+     * });
+     * ```
      */
     public beforeAll(
         func: (
@@ -404,12 +485,19 @@ export class Server {
     }
 
     /**
-     * Sets a callback function to be executed before running each procedure
+     * Sets a callback function to be executed before running each procedure.
+     *
+     * ```ts
+     * const server = new Server();
+     * server.beforeAll((context: RequestContext, procedureContext: ProcedureRequestContext) => {
+     *      console.log(context, procedureContext);
+     * });
+     * ```
      */
     public beforeEach(
         func: (
             context: RequestContext,
-            procedure: ProcedureRequestContext,
+            procedureContext: ProcedureRequestContext,
         ) => void | Promise<void>,
     ): Server {
         this.beforeEachFunc = func;
@@ -418,7 +506,14 @@ export class Server {
     }
 
     /**
-     * Sets a callback function to be executed after running each procedure
+     * Sets a callback function to be executed after running each procedure.
+     *
+     * ```ts
+     * const server = new Server();
+     * server.beforeAll((context: RequestContext, procedureContext: ProcedureRequestContext) => {
+     *      console.log(context, procedureContext);
+     * });
+     * ```
      */
     public afterEach(
         func: (
@@ -432,7 +527,14 @@ export class Server {
     }
 
     /**
-     * Sets a callback function to be executed after all procedures have run
+     * Sets a callback function to be executed after all procedures have run.
+     *
+     * ```ts
+     * const server = new Server();
+     * server.afterAll((context: RequestContext) => {
+     *      console.log(context);
+     * });
+     * ```
      */
     public afterAll(
         func: (
@@ -445,7 +547,14 @@ export class Server {
     }
 
     /**
-     * Sets a callback function to be executed when an unhandled error occurs
+     * Sets a callback function to be executed when an unhandled error occurs.
+     *
+     * ```ts
+     * const server = new Server();
+     * server.afterAll((context: RequestContext) => {
+     *      console.log(context);
+     * });
+     * ```
      */
     public onError(
         func: (
@@ -460,7 +569,7 @@ export class Server {
     }
 
     /**
-     * Starts the server instance
+     * Starts the server instance.
      */
     public start(): void {
         const hostname = this.config.host;
@@ -495,7 +604,7 @@ export class Server {
     }
 
     /**
-     * Stops the server instance
+     * Stops the server instance.
      */
     public async stop() {
         this.config.logger.debug(`Stopping server instance.`);
@@ -506,7 +615,7 @@ export class Server {
     }
 
     /**
-     * Returns the API Definition object
+     * Generates and returns the API Definition object.
      */
     public getAPIDefinition(): APIDefinition {
         const apis: Record<
@@ -580,7 +689,7 @@ export class Server {
     }
 
     /**
-     * Handles incoming requests
+     * Handles incoming requests.
      */
     private async requestHandler(req: Request): Promise<Response> {
         // Checking client origin when the server has a strict access control origin definition
@@ -616,7 +725,7 @@ export class Server {
     }
 
     /**
-     * Handles HTTP requests
+     * Handles HTTP requests.
      */
     private async handleHTTPRequest(req: Request): Promise<Response> {
         this.config.logger.debug(`Processing HTTP request`);
@@ -778,7 +887,7 @@ export class Server {
     }
 
     /**
-     * Handles WebSockets requests
+     * Handles WebSockets requests.
      */
     private handleWebsocketRequest(req: Request): Response {
         this.config.logger.debug(`Processing Websocket request`);
@@ -937,6 +1046,7 @@ export class Server {
         const context: RequestContext = {
             protocol: request.protocol,
             api: request.api,
+            env: this.config.env,
             request: {
                 id: request.options?.request_id || crypto.randomUUID(),
                 options: request.options || {},
@@ -1010,9 +1120,9 @@ export class Server {
                         procedure: ProcedureRequestContext;
                         result: ProcedureResult;
                     } | {
-                    procedure: ProcedureRequestContext;
-                    error: unknown;
-                }
+                        procedure: ProcedureRequestContext;
+                        error: unknown;
+                    }
                 >[] = procedures.map((procedure) => {
                     return new Promise((resolve, _) => {
                         resolve(this.raceProcedure(context, procedure));
@@ -1050,7 +1160,6 @@ export class Server {
                         execution_time: executionDetails[promiseResult.procedure.id].executionTime,
                     };
                 }
-
             }
         }
 

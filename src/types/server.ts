@@ -56,14 +56,44 @@ export type SubscriptionOnClientDisconnectFn = (websocketId: WebSocketId, contex
 export type SubscriptionOnResourceUpdateFn = (protocolVersion: ProtocolVersion, api: Api, name: ResourceName, resource: ResourceContent) => ResourceContent | Promise<ResourceContent>;
 
 export type RequestContext = {
+    /**
+     * O-JSON-RPC protocol version
+     */
     protocol: ProtocolVersion;
+
+    /**
+     * API value used in the request
+     */
     api: Api;
+
+    /**
+     * Environment in which the server is running
+     */
+    env: string;
+
+    /**
+     * Information provided in the options section of the request
+     */
     request: {
         id: string;
         options: RequestOptions;
     };
+
+    /**
+     * Utility function to use from the procedure execution to notify subscribers
+     * @param resourceName - Name of the resource to notify ab out
+     * @param resource - Resource content
+     */
     notifySubscribers: (resourceName: ResourceName, resource: Json) => void;
+
+    /**
+     * ID assigned by the server to the websocket connection
+     */
     websocketId?: WebSocketId;
+
+    /**
+     * Any custom value set in the request context either by the hooks or procedures execution
+     */
     customValues?: Record<string, unknown>;
 };
 
@@ -84,6 +114,7 @@ export type RequestOptions = {
      * This id is returned in the response when `return.request_id` is true
      */
     request_id?: string;
+
     /**
      * Section to configure different options for the execution of the request
      */

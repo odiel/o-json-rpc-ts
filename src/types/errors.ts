@@ -1,5 +1,5 @@
 import type { ErrorResponse } from './server.ts';
-import type {ProcedureName} from './common.ts';
+import type { ProcedureName } from './common.ts';
 
 export class ServerInstanceError extends Error {
     constructor(
@@ -158,7 +158,6 @@ export function toErrorResponse(error: unknown): ErrorResponse {
         message: 'Unhandled error.',
     };
 }
-
 
 // Other server errors
 export class InvalidZodDefinition extends Error {

@@ -5,6 +5,9 @@ export enum LogLevel {
     ERROR = 3,
 }
 
+/**
+ * Abstract Logger class to instantiate and pass to the Server instance.
+ */
 export abstract class AbstractLogger {
     constructor(protected logLevel: LogLevel) {
     }
@@ -22,6 +25,9 @@ export abstract class AbstractLogger {
     ): void;
 }
 
+/**
+ * Simple logger class that outputs messages to the console.
+ */
 export class ConsoleLogger extends AbstractLogger {
     constructor(logLevel: LogLevel) {
         super(logLevel);
