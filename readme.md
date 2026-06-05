@@ -9,7 +9,7 @@ Typescript implementation of the [O-JSON-RPC](https://github.com/odiel/o-json-rp
 
 O-JSON-RPC-TS is available in [JSR](https://jsr.io/@o-json-rpc/o-json-rpc-ts);
 
-To use it first add it to your project:
+To use it, first add it to your project:
 
 ```shell
 deno add jsr:@o-json-rpc/o-json-rpc-ts

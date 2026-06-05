@@ -441,7 +441,7 @@ export class Server {
      */
     public registerSubscription(
         api: Api | string,
-        resourceName: ResourceName | string ,
+        resourceName: ResourceName | string,
         options?: {
             onClientConnect?: SubscriptionOnClientConnectFn;
             onClientDisconnect?: SubscriptionOnClientDisconnectFn;
