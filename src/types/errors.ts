@@ -28,6 +28,9 @@ export enum ErrorCodes {
     PROCEDURE_NOT_EXECUTED = 'PROCEDURE:NOT_EXECUTED',
 }
 
+/**
+ * Generic Error class wrapper
+ */
 export class JRPCError extends Error {
     constructor(
         public code: string,
@@ -37,6 +40,9 @@ export class JRPCError extends Error {
     }
 }
 
+/**
+ * Error to be thrown when upgrading requests is not supported.
+ */
 export class ServerUpgradeRequestNotSupported extends JRPCError {
     constructor() {
         super(
@@ -46,6 +52,9 @@ export class ServerUpgradeRequestNotSupported extends JRPCError {
     }
 }
 
+/**
+ * Error to be thrown when the request content exceeds the allowed size.
+ */
 export class ServerRequestContentTooBig extends JRPCError {
     constructor() {
         super(
@@ -55,6 +64,9 @@ export class ServerRequestContentTooBig extends JRPCError {
     }
 }
 
+/**
+ * Error to be thrown when the request is being sent using a not supported HTTP method.
+ */
 export class ServerRequestMethodNotSupported extends JRPCError {
     constructor() {
         super(
@@ -64,6 +76,9 @@ export class ServerRequestMethodNotSupported extends JRPCError {
     }
 }
 
+/**
+ * Error to be thrown when the content of the request is not a JSON or the JSON content does not match the request schema definition.
+ */
 export class ServerIncompatibleRequestContent extends JRPCError {
     constructor() {
         super(
@@ -73,6 +88,9 @@ export class ServerIncompatibleRequestContent extends JRPCError {
     }
 }
 
+/**
+ * Error to be thrown when the response from the server is not a JSON or the JSON content does not match the response schema definition.
+ */
 export class ServerIncompatibleResponseContent extends JRPCError {
     constructor() {
         super(
@@ -82,6 +100,9 @@ export class ServerIncompatibleResponseContent extends JRPCError {
     }
 }
 
+/**
+ * Error to be thrown by the application implementation when the logic detects the request does not provide the right credentials.
+ */
 export class ServerNotAuthenticatedError extends JRPCError {
     constructor() {
         super(
@@ -91,6 +112,9 @@ export class ServerNotAuthenticatedError extends JRPCError {
     }
 }
 
+/**
+ * Error to be thrown by the application implementation when the request is not authorized to proceed.
+ */
 export class ServerNotAuthorizedError extends JRPCError {
     constructor() {
         super(
@@ -100,6 +124,9 @@ export class ServerNotAuthorizedError extends JRPCError {
     }
 }
 
+/**
+ * Error to be thrown when the server catches a lower level unhandled error.
+ */
 export class ServerUnhandledError extends JRPCError {
     constructor(public procedureName?: string) {
         super(
@@ -109,6 +136,9 @@ export class ServerUnhandledError extends JRPCError {
     }
 }
 
+/**
+ * Error to be thrown when the input content of a procedure does not match the resource schema definition.
+ */
 export class ProcedureIncompatibleInput extends JRPCError {
     constructor(public procedureName: ProcedureName) {
         super(
@@ -118,6 +148,9 @@ export class ProcedureIncompatibleInput extends JRPCError {
     }
 }
 
+/**
+ * Error to be thrown when the output content of a procedure does not match the resource schema definition.
+ */
 export class ProcedureIncompatibleResult extends JRPCError {
     constructor(public procedureName: ProcedureName) {
         super(
@@ -127,24 +160,36 @@ export class ProcedureIncompatibleResult extends JRPCError {
     }
 }
 
+/**
+ * Error to be thrown when the request is attempting to execute a procedure that has is not registered for the requested API.
+ */
 export class ProcedureNotFound extends JRPCError {
     constructor() {
         super(ErrorCodes.PROCEDURE_NOT_FOUND, 'Procedure not found.');
     }
 }
 
+/**
+ * Error to be thrown when a procedure execution exceeds the allowed time.
+ */
 export class ProcedureTimeout extends JRPCError {
     constructor() {
         super(ErrorCodes.PROCEDURE_TIMEOUT, 'Procedure timed out.');
     }
 }
 
+/**
+ * Error to be thrown when the application implementation identifies the user is not authorized to execute the procedure.
+ */
 export class ProcedureNotAuthorized extends JRPCError {
     constructor() {
         super(ErrorCodes.PROCEDURE_NOT_AUTHORIZED, 'Not authorized.');
     }
 }
 
+/**
+ * Function for converting an error object to its section in the response.
+ */
 export function toErrorResponse(error: unknown): ErrorResponse {
     if (error instanceof JRPCError) {
         return {
@@ -159,7 +204,8 @@ export function toErrorResponse(error: unknown): ErrorResponse {
     };
 }
 
-// Other server errors
+// Server instance errors
+
 export class InvalidZodDefinition extends Error {
     constructor(public resourceName: string, public zodMessage?: string) {
         super(`Converting a Zod definition to JSON schema failed for resource: ${resourceName}.`);

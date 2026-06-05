@@ -184,7 +184,7 @@ export type ServerResponseDetails = {
 
 export type ErrorResponse = {
     code: string;
-    message: string;
+    message?: string;
     details?: Record<string, unknown>;
 };
 

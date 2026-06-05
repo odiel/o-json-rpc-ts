@@ -263,6 +263,9 @@ export class Server {
      * @throws ServerInstanceError if the resource is already registered
      *
      * ```ts
+     * import { Server } from '@o-json-rpc/o-json-rpc-ts';
+     * import * as z from 'zod';
+     *
      * const zUser = z.object({
      *     id: z.string(),
      *     email: z.string()
@@ -272,15 +275,18 @@ export class Server {
      * server.registerResource('v1', 'User', zUser);
      * ```
      */
-    public registerResource(api: Api, name: ResourceName, schema: ZodType): Server {
-        if (!this.resourceDefinitions.get(api)) {
-            this.resourceDefinitions.set(api, {});
+    public registerResource(api: Api | string, name: ResourceName | string, schema: ZodType): Server {
+        const apiValue = api as Api;
+        const nameValue = name as ResourceName;
+
+        if (!this.resourceDefinitions.get(apiValue)) {
+            this.resourceDefinitions.set(apiValue, {});
         }
 
-        const apiResources = this.resourceDefinitions.get(api);
+        const apiResources = this.resourceDefinitions.get(apiValue);
 
-        if (apiResources![name]) {
-            const msg = `[${api}]: resource [${name}] is already registered.`;
+        if (apiResources![nameValue]) {
+            const msg = `[${apiValue}]: resource [${nameValue}] is already registered.`;
 
             this.config.logger.error(
                 msg,
@@ -290,10 +296,10 @@ export class Server {
         }
 
         this.config.logger.debug(
-            `[${api}]: registering resource: ${name}`,
+            `[${apiValue}]: registering resource: ${nameValue}`,
         );
 
-        apiResources![name] = schema;
+        apiResources![nameValue] = schema;
         return this;
     }
 
@@ -308,14 +314,24 @@ export class Server {
      * @throws ServerInstanceError if either the input or output resources are not previously registered or if the procedure is already registered
      *
      * ```ts
+     * import { Server } from '@o-json-rpc/o-json-rpc-ts';
+     *
      * const server = new Server();
      * server
      *      .registerProcedure('v1', 'registerUser', registerUserProcedure, { input: 'UserCredentials', output: 'UserId' });
      *      .registerProcedure('v1', 'getUser', getUserProcedure, { input: 'UserId', output: 'User' });
      * ```
      */
-    public registerProcedure(api: Api, procedureName: ProcedureName, handler: ProcedureHandlerFunction, options?: { input?: ResourceName; output?: ResourceName }): Server {
-        let apiProcedures = this.procedureHandlers.get(api);
+    public registerProcedure(
+        api: Api | string,
+        procedureName: ProcedureName | string,
+        handler: ProcedureHandlerFunction,
+        options?: { input?: ResourceName | string; output?: ResourceName | string },
+    ): Server {
+        const apiValue = api as Api;
+        const procedureNameValue = procedureName as ProcedureName;
+
+        let apiProcedures = this.procedureHandlers.get(apiValue);
 
         if (!apiProcedures) {
             apiProcedures = new Map<
@@ -323,55 +339,61 @@ export class Server {
                 ProcedureRegistry
             >();
             this.procedureHandlers.set(
-                api,
+                apiValue,
                 apiProcedures!,
             );
         }
 
-        if (apiProcedures!.get(procedureName as ProcedureName)) {
-            const msg = `[${api}]: procedure handler [${procedureName}] is already registered.`;
+        if (apiProcedures!.get(procedureNameValue as ProcedureName)) {
+            const msg = `[${apiValue}]: procedure handler [${procedureNameValue}] is already registered.`;
 
             this.config.logger.error(msg);
             throw new ServerInstanceError(msg);
         }
 
         if (options?.input) {
-            const registeredResource = this.resourceDefinitions.get(api);
+            const registeredResource = this.resourceDefinitions.get(apiValue);
 
-            const msg = `[${api}]: input resource [${options.input}] for procedure [${procedureName}] has not been registered yet.`;
+            const msg = `[${apiValue}]: input resource [${options.input}] for procedure [${procedureNameValue}] has not been registered yet.`;
 
             if (!registeredResource) {
                 this.config.logger.error(msg);
                 throw new ServerInstanceError(msg);
             }
 
-            if (!registeredResource[options.input]) {
+            if (!registeredResource[options.input as ResourceName]) {
                 this.config.logger.error(msg);
                 throw new ServerInstanceError(msg);
             }
         }
 
         if (options?.output) {
-            const registeredResource = this.resourceDefinitions.get(api);
+            const registeredResource = this.resourceDefinitions.get(apiValue);
 
-            const msg = `[${api}]: output resource [${options.output}] for procedure [${procedureName}] has not been registered yet.`;
+            const msg = `[${apiValue}]: output resource [${options.output}] for procedure [${procedureNameValue}] has not been registered yet.`;
 
             if (!registeredResource) {
                 this.config.logger.error(msg);
                 throw new ServerInstanceError(msg);
             }
 
-            if (!registeredResource[options.output]) {
+            if (!registeredResource[options.output as ResourceName]) {
                 this.config.logger.error(msg);
                 throw new ServerInstanceError(msg);
             }
         }
 
         this.config.logger.debug(
-            `[${api}]: registering procedure: ${procedureName}`,
+            `[${apiValue}]: registering procedure: ${procedureNameValue}`,
         );
 
-        apiProcedures!.set(procedureName as ProcedureName, { api, name: procedureName, fn: handler, input: options?.input, output: options?.output });
+        apiProcedures!.set(procedureNameValue as ProcedureName, {
+            api: apiValue,
+            name: procedureNameValue,
+            fn: handler,
+            input: options?.input as ResourceName,
+            output: options?.output as ResourceName,
+        });
 
         return this;
     }
@@ -389,6 +411,9 @@ export class Server {
      * @throws ServerInstanceError if either the resource is not previously registered or if there is subscription already registered for the same resource
      *
      * ```ts
+     * import { Server } from '@o-json-rpc/o-json-rpc-ts';
+     * import * as z from 'zod';
+     *
      * const zUser = z.object({
      *     id: z.string(),
      *     email: z.string()
@@ -415,15 +440,18 @@ export class Server {
      * ```
      */
     public registerSubscription(
-        api: Api,
-        resourceName: ResourceName,
+        api: Api | string,
+        resourceName: ResourceName | string ,
         options?: {
             onClientConnect?: SubscriptionOnClientConnectFn;
             onClientDisconnect?: SubscriptionOnClientDisconnectFn;
             onResourceUpdate?: SubscriptionOnResourceUpdateFn;
         },
     ): Server {
-        let apiSubscriptions = this.subscriptionHandlers.get(api);
+        const apiValue = api as Api;
+        const resourceNameValue = resourceName as ResourceName;
+
+        let apiSubscriptions = this.subscriptionHandlers.get(apiValue);
 
         if (!apiSubscriptions) {
             apiSubscriptions = new Map<
@@ -431,34 +459,34 @@ export class Server {
                 SubscriptionRegistry
             >();
             this.subscriptionHandlers.set(
-                api,
+                apiValue,
                 apiSubscriptions,
             );
         }
 
-        const registeredResource = this.resourceDefinitions.get(api);
+        const registeredResource = this.resourceDefinitions.get(apiValue);
 
         if (!registeredResource) {
-            const msg = `[${api}]: subscription for resource [${resourceName}] not possible, resource has not been registered yet.`;
+            const msg = `[${apiValue}]: subscription for resource [${resourceNameValue}] not possible, resource has not been registered yet.`;
 
             this.config.logger.error(msg);
             throw new ServerInstanceError(msg);
         }
 
-        if (apiSubscriptions.get(resourceName)) {
-            const msg = `[${api}]: subscription handler for [${resourceName}] already registered.`;
+        if (apiSubscriptions.get(resourceNameValue)) {
+            const msg = `[${apiValue}]: subscription handler for [${resourceNameValue}] already registered.`;
 
             this.config.logger.error(msg);
             throw new ServerInstanceError(msg);
         }
 
         this.config.logger.debug(
-            `[${api}]: registering subscription for resource [${resourceName}]`,
+            `[${apiValue}]: registering subscription for resource [${resourceNameValue}]`,
         );
 
         apiSubscriptions.set(
-            resourceName,
-            { api: api, resourceName: resourceName, ...options },
+            resourceNameValue,
+            { api: apiValue, resourceName: resourceNameValue, ...options },
         );
 
         return this;
@@ -468,6 +496,8 @@ export class Server {
      * Sets a callback function to be executed before running any procedure.
      *
      * ```ts
+     * import { Server } from '@o-json-rpc/o-json-rpc-ts';
+     *
      * const server = new Server();
      * server.beforeAll((context: RequestContext) => {
      *      console.log(context);
@@ -488,6 +518,8 @@ export class Server {
      * Sets a callback function to be executed before running each procedure.
      *
      * ```ts
+     * import { Server } from '@o-json-rpc/o-json-rpc-ts';
+     *
      * const server = new Server();
      * server.beforeAll((context: RequestContext, procedureContext: ProcedureRequestContext) => {
      *      console.log(context, procedureContext);
@@ -509,6 +541,8 @@ export class Server {
      * Sets a callback function to be executed after running each procedure.
      *
      * ```ts
+     * import { Server } from '@o-json-rpc/o-json-rpc-ts';
+     *
      * const server = new Server();
      * server.beforeAll((context: RequestContext, procedureContext: ProcedureRequestContext) => {
      *      console.log(context, procedureContext);
@@ -530,6 +564,8 @@ export class Server {
      * Sets a callback function to be executed after all procedures have run.
      *
      * ```ts
+     * import { Server } from '@o-json-rpc/o-json-rpc-ts';
+     *
      * const server = new Server();
      * server.afterAll((context: RequestContext) => {
      *      console.log(context);
@@ -550,6 +586,8 @@ export class Server {
      * Sets a callback function to be executed when an unhandled error occurs.
      *
      * ```ts
+     * import { Server } from '@o-json-rpc/o-json-rpc-ts';
+     *
      * const server = new Server();
      * server.afterAll((context: RequestContext) => {
      *      console.log(context);

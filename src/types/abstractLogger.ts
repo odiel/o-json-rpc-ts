@@ -12,12 +12,37 @@ export abstract class AbstractLogger {
     constructor(protected logLevel: LogLevel) {
     }
 
+    /**
+     * Logs an entry with DEBUG level
+     *
+     * @param message Message to log
+     * @param metadata Log metadata
+     */
     abstract debug(message: string, metadata?: Record<string, unknown>): void;
 
+    /**
+     * Logs an entry with INFO level
+     *
+     * @param message Message to log
+     * @param metadata Log metadata
+     */
     abstract info(message: string, metadata?: Record<string, unknown>): void;
 
+    /**
+     * Logs an entry with WARNING level
+     *
+     * @param message Message to log
+     * @param metadata Log metadata
+     */
     abstract warning(message: string, metadata?: Record<string, unknown>): void;
 
+    /**
+     * Logs an entry with ERROR level
+     *
+     * @param message Message to log
+     * @param metadata Log metadata
+     * @param error Optional error object to add to the log
+     */
     abstract error(
         message: string,
         metadata?: Record<string, unknown>,
