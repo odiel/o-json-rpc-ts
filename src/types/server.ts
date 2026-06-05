@@ -191,16 +191,16 @@ export type ErrorResponse = {
 export type ServerWebSocket = WebSocket & { id: WebSocketId };
 
 export type APIDefinition = {
-    protocol: ProtocolVersion;
+    protocol: ProtocolVersion | string;
     apis: Record<
-        Api,
+        Api | string,
         {
             procedures: Record<string, {
                 input?: string;
                 output?: string;
             }>;
             subscriptions: string[];
-            resources: Record<ResourceName, JSONSchema>;
+            resources: Record<ResourceName | string, JSONSchema>;
         }
     >;
 };
