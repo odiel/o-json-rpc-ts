@@ -1,5 +1,5 @@
 import { assertEquals, assertGreaterOrEqual, assertMatch, assertThrows } from '@std/assert';
-import type { JRPCError, ProcedureRequestContext, RequestContext } from '../src/index.ts';
+import type { JRPCError, ProcedureRequestContext, ProcedureResult, RequestContext } from '../src/index.ts';
 import { LogLevel, Server, ServerInstanceError } from '../src/index.ts';
 import {
     APIs,
@@ -1407,7 +1407,7 @@ Deno.test('Asserting hooks execution.', async () => {
         hooksExecuted.beforeEach += 1;
     });
 
-    server.afterEach((_context: RequestContext) => {
+    server.afterEach((_result: ProcedureResult, _context: RequestContext) => {
         hooksExecuted.afterEach += 1;
     });
 
@@ -1603,7 +1603,7 @@ Deno.test('Asserting unhandled errors in the [afterEach] hook.', async () => {
         .registerProcedure(APIs.v1, procedureNames.ping, pingV1)
         .registerProcedure(APIs.v1, procedureNames.hello, helloV1, { input: HelloInputV1.name, output: Greeting.name })
         .afterEach(
-            (_c: RequestContext, procedure: ProcedureRequestContext) => {
+            (_result: ProcedureResult, _c: RequestContext, procedure: ProcedureRequestContext) => {
                 if (procedure.name == 'ping') {
                     throw new Error('custom error');
                 }
@@ -1695,7 +1695,7 @@ Deno.test('Asserting errors in the [beforeAll] hook are handled.', async () => {
             throw new Error('custom error');
         })
         .onError(
-            (_context: RequestContext, _error: unknown): JRPCError => {
+            (_error: unknown, _context: RequestContext): JRPCError => {
                 return new ApplicationInternalError();
             },
         )
@@ -1732,7 +1732,7 @@ Deno.test('Asserting errors in the [afterAll] hook are handled.', async () => {
             throw new Error('custom error');
         })
         .onError(
-            (_context: RequestContext, _error: unknown): JRPCError => {
+            (_error: unknown, _context: RequestContext): JRPCError => {
                 return new ApplicationInternalError();
             },
         )
@@ -1777,8 +1777,8 @@ Deno.test('Asserting errors in the [beforeEach] hook are handled.', async () => 
         )
         .onError(
             (
-                _context: RequestContext,
                 _error: unknown,
+                _context: RequestContext,
                 _procedureContext?: ProcedureRequestContext,
             ): JRPCError => {
                 return new ProcedureError();
@@ -1828,7 +1828,7 @@ Deno.test('Asserting errors in the [afterEach] hook are handled.', async () => {
         .registerProcedure(APIs.v1, procedureNames.ping, pingV1)
         .registerProcedure(APIs.v1, procedureNames.hello, helloV1, { input: HelloInputV1.name, output: Greeting.name })
         .afterEach(
-            (_c: RequestContext, procedure: ProcedureRequestContext) => {
+            (_result: ProcedureResult, _c: RequestContext, procedure: ProcedureRequestContext) => {
                 if (procedure.name == 'ping') {
                     throw new Error('custom error');
                 }
@@ -1836,8 +1836,8 @@ Deno.test('Asserting errors in the [afterEach] hook are handled.', async () => {
         )
         .onError(
             (
-                _context: RequestContext,
                 _error: unknown,
+                _context: RequestContext,
                 _procedureContext?: ProcedureRequestContext,
             ): JRPCError => {
                 return new ProcedureError();
@@ -1888,8 +1888,8 @@ Deno.test('Asserting errors during a procedure execution are handled.', async ()
         .registerProcedure(APIs.v1, procedureNames.fail, failingV1)
         .onError(
             (
-                _context: RequestContext,
                 _error: unknown,
+                _context: RequestContext,
                 _procedureContext?: ProcedureRequestContext,
             ): JRPCError => {
                 return new ProcedureError();

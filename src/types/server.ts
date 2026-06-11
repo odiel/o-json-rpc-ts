@@ -157,7 +157,7 @@ export type ProcedureResponse = {
     error: ErrorResponse;
 } | null;
 
-export type ServerResultsResponse = {
+export type ServerResponse = {
     protocol: ProtocolVersion;
     api: Api;
     procedures?: Record<ProcedureRequestId, ProcedureResponse>;

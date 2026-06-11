@@ -1,6 +1,6 @@
 {
     "name": "@o-json-rpc/o-json-rpc-ts",
-    "version": "0.0.3",
+    "version": "0.0.4",
     "license": "MIT",
     "exports": "./src/index.ts",
     "tasks": {
@@ -8,7 +8,7 @@
         "l": "deno lint",
         "f": "deno fmt",
         "fl": "deno fmt && deno lint",
-        "tests": "deno test --allow-net --trace-leaks --coverage",
+        "tests": "deno test --allow-net --trace-leaks",
         "coverage": "deno task tests && deno coverage --html --exclude=\"src/clients\" --exclude=\"tests\""
     },
     "imports": {

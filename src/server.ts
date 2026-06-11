@@ -17,7 +17,7 @@ import type {
     ResourceName,
     ServerErrorResponse,
     ServerRequest,
-    ServerResultsResponse,
+    ServerResponse,
     ServerWebSocket,
     SubscriptionOnClientConnectFn,
     SubscriptionOnClientDisconnectFn,
@@ -154,9 +154,9 @@ export class Server {
      * Callback function to execute after processing each procedure.
      */
     private afterEachFunc?: (
+        result: ProcedureResult,
         context: RequestContext,
         procedure: ProcedureRequestContext,
-        result: ProcedureResult,
     ) => void | Promise<void>;
 
     /**
@@ -170,8 +170,8 @@ export class Server {
      * Callback function to execute when an unhandled error occurs.
      */
     private onErrorFunc?: (
-        context: RequestContext,
         error: unknown,
+        context: RequestContext,
         procedureContext?: ProcedureRequestContext,
     ) => JRPCError | Promise<JRPCError>;
 
@@ -551,6 +551,7 @@ export class Server {
      */
     public afterEach(
         func: (
+            result: ProcedureResult,
             context: RequestContext,
             procedure: ProcedureRequestContext,
         ) => void | Promise<void>,
@@ -596,8 +597,8 @@ export class Server {
      */
     public onError(
         func: (
-            context: RequestContext,
             error: unknown,
+            context: RequestContext,
             procedureContext?: ProcedureRequestContext,
         ) => JRPCError | Promise<JRPCError>,
     ): Server {
@@ -920,7 +921,7 @@ export class Server {
         return headers;
     }
 
-    private getHttpResponse(req: Request, requestResult: ServerErrorResponse | ServerResultsResponse | APIDefinition | undefined, statusCode: number) {
+    private getHttpResponse(req: Request, requestResult: ServerErrorResponse | ServerResponse | APIDefinition | undefined, statusCode: number) {
         return Response.json(requestResult, { status: statusCode, headers: this.getResponseHeaders(req) });
     }
 
@@ -1071,12 +1072,12 @@ export class Server {
     private async processRequest(
         request: ServerRequest,
         socket?: ServerWebSocket,
-    ): Promise<ServerResultsResponse> {
+    ): Promise<ServerResponse> {
         const requestStartTime = Date.now();
 
         const { protocol, api: apiVersion, procedures, subscriptions } = request;
 
-        const serverResponse: ServerResultsResponse = {
+        const serverResponse: ServerResponse = {
             protocol: protocol,
             api: apiVersion,
         };
@@ -1311,9 +1312,9 @@ export class Server {
 
         try {
             this.afterEachFunc && await this.afterEachFunc(
+                procedureResult,
                 context,
                 procedureRequest,
-                procedureResult,
             );
         } catch (e) {
             this.config.logger.error(
@@ -1382,7 +1383,7 @@ export class Server {
         procedureContext?: ProcedureRequestContext,
     ): Promise<Error> {
         if (this.onErrorFunc) {
-            throw await this.onErrorFunc(context, error, procedureContext);
+            throw await this.onErrorFunc(error, context, procedureContext);
         }
 
         if (error instanceof JRPCError) {
@@ -1447,7 +1448,7 @@ export class Server {
     private populateResponseObject(
         procedureResult: ProcedureResult,
         procedure: ProcedureRequestContext,
-        response: ServerResultsResponse,
+        response: ServerResponse,
     ) {
         if (!response.procedures) {
             return [];

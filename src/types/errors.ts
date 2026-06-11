@@ -24,6 +24,7 @@ export enum ErrorCodes {
     PROCEDURE_INCOMPATIBLE_OUTPUT = 'PROCEDURE:INCOMPATIBLE_OUTPUT',
     PROCEDURE_NOT_FOUND = 'PROCEDURE:NOT_FOUND',
     PROCEDURE_TIMEOUT = 'PROCEDURE:TIMEOUT',
+    PROCEDURE_NOT_AUTHENTICATED = 'PROCEDURE:NOT_AUTHENTICATED',
     PROCEDURE_NOT_AUTHORIZED = 'PROCEDURE:NOT_AUTHORIZED',
     PROCEDURE_NOT_EXECUTED = 'PROCEDURE:NOT_EXECUTED',
 }
@@ -103,7 +104,7 @@ export class ServerIncompatibleResponseContent extends JRPCError {
 /**
  * Error to be thrown by the application implementation when the logic detects the request does not provide the right credentials.
  */
-export class ServerNotAuthenticatedError extends JRPCError {
+export class ServerNotAuthenticated extends JRPCError {
     constructor() {
         super(
             ErrorCodes.SERVER_NOT_AUTHENTICATED,
@@ -115,7 +116,7 @@ export class ServerNotAuthenticatedError extends JRPCError {
 /**
  * Error to be thrown by the application implementation when the request is not authorized to proceed.
  */
-export class ServerNotAuthorizedError extends JRPCError {
+export class ServerNotAuthorized extends JRPCError {
     constructor() {
         super(
             ErrorCodes.SERVER_NOT_AUTHORIZED,
@@ -175,6 +176,18 @@ export class ProcedureNotFound extends JRPCError {
 export class ProcedureTimeout extends JRPCError {
     constructor() {
         super(ErrorCodes.PROCEDURE_TIMEOUT, 'Procedure timed out.');
+    }
+}
+
+/**
+ * Error to be thrown by the application implementation when the logic detects the request does not provide the right credentials.
+ */
+export class ProcedureNotAuthenticated extends JRPCError {
+    constructor() {
+        super(
+            ErrorCodes.PROCEDURE_NOT_AUTHENTICATED,
+            'Not authenticated.',
+        );
     }
 }
 

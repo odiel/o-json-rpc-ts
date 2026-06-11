@@ -1,5 +1,5 @@
 import type { Api, ProcedureName, ProcedureRequestContext, ProcedureResult, RequestContext, Resource, ResourceName } from '../src/index.ts';
-import { ServerNotAuthenticatedError } from '../src/index.ts';
+import { ServerNotAuthenticated } from '../src/index.ts';
 import { JRPCError } from '../src/index.ts';
 
 import { sleep } from './common.ts';
@@ -239,7 +239,7 @@ export function getAccountInformationV1(
     const authentication = context.request.options.authentication;
 
     if (!authentication) {
-        throw new ServerNotAuthenticatedError();
+        throw new ServerNotAuthenticated();
     }
 
     const sessionId = authentication.token;
@@ -247,13 +247,13 @@ export function getAccountInformationV1(
     const userEmail = sessions[sessionId];
 
     if (!userEmail) {
-        throw new ServerNotAuthenticatedError();
+        throw new ServerNotAuthenticated();
     }
 
     const userRegistration = registeredUsers[userEmail];
 
     if (!userRegistration) {
-        throw new ServerNotAuthenticatedError();
+        throw new ServerNotAuthenticated();
     }
 
     return {
