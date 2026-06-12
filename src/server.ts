@@ -28,6 +28,7 @@ import type {
 
 import {
     ConsoleLogger,
+    ContextCustomValues,
     Environment,
     ExecutionStrategy,
     HttpMethod,
@@ -1093,7 +1094,7 @@ export class Server {
             notifySubscribers: (resourceName: ResourceName, content: ResourceContent) => {
                 this.sendResourcesToSubscribers(request.api, resourceName, content);
             },
-            customValues: {},
+            customValues: new ContextCustomValues(),
             websocketId: socket?.id,
         };
 

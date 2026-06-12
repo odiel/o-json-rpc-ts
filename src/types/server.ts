@@ -92,9 +92,9 @@ export type RequestContext = {
     websocketId?: WebSocketId;
 
     /**
-     * Any custom value set in the request context either by the hooks or procedures execution
+     * Custom values set in the request context either by the hooks or procedures execution
      */
-    customValues?: Record<string, unknown>;
+    customValues: ContextCustomValues;
 };
 
 export type ProcedureExecution = {
@@ -204,3 +204,23 @@ export type APIDefinition = {
         }
     >;
 };
+
+export class ContextCustomValues {
+    private record: Record<string, unknown> = {};
+
+    public set<T>(key: string, value: T) {
+        this.record[key] = value;
+    }
+
+    public get<T>(key: string): T | undefined {
+        return this.record[key] as T;
+    }
+
+    public has(key: string): boolean {
+        return this.record[key] !== undefined;
+    }
+
+    public delete(key: string) {
+        delete this.record[key];
+    }
+}
