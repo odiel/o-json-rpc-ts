@@ -1,6 +1,6 @@
-import type { Api, ProcedureName, ProcedureRequestContext, ProcedureResult, RequestContext, Resource, ResourceName } from '../src/index.ts';
-import { ServerNotAuthenticated } from '../src/index.ts';
-import { JRPCError } from '../src/index.ts';
+import type { Api, ProcedureName, ProcedureRequestContext, ProcedureResult, RequestContext, Resource, ResourceName } from '../../src/index.ts';
+import { ServerNotAuthenticated } from '../../src/index.ts';
+import { JRPCError } from '../../src/index.ts';
 
 import { sleep } from './common.ts';
 

@@ -1,5 +1,5 @@
 import { assertEquals, assertGreaterOrEqual, assertLessOrEqual, fail } from '@std/assert';
-import { AbstractLogger, LogLevel, type ResourceName, Server } from '../src/index.ts';
+import { AbstractLogger, LogLevel, type ResourceName, Server } from '../../src/index.ts';
 
 export const sleepTimeoutIds: Record<number, number> = {};
 

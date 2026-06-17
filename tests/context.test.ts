@@ -1,8 +1,8 @@
 import { assertEquals } from '@std/assert';
 import type { ProcedureRequestContext, ProcedureResult, RequestContext, Server } from '../src/index.ts';
-import { APIs } from './procedures.ts';
+import { APIs } from './setup/procedures.ts';
 
-import { createServer, httpRequest, stopServer } from './common.ts';
+import { createServer, httpRequest, stopServer } from './setup/common.ts';
 
 let server: Server;
 

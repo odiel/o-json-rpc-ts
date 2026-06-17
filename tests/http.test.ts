@@ -17,9 +17,9 @@ import {
     ProcedureError,
     procedureNames,
     reportV2,
-} from './procedures.ts';
+} from './setup/procedures.ts';
 
-import { assertProcedureDetails, createServer, host, httpRequest, port, serverLogger, stopServer, uuidRegex } from './common.ts';
+import { assertProcedureDetails, createServer, host, httpRequest, port, serverLogger, stopServer, uuidRegex } from './setup/common.ts';
 
 let server: Server;
 

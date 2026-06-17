@@ -1,8 +1,8 @@
 import { assertEquals, assertMatch } from '@std/assert';
 import type { Server } from '../src/index.ts';
-import { APIs, authenticateUserV1, getAccountInformationV1, procedureNames, registerUserV1, UserAccount, UserCredentials, UserSession } from './procedures.ts';
+import { APIs, authenticateUserV1, getAccountInformationV1, procedureNames, registerUserV1, UserAccount, UserCredentials, UserSession } from './setup/procedures.ts';
 
-import { createServer, httpRequest, stopServer, uuidRegex } from './common.ts';
+import { createServer, httpRequest, stopServer, uuidRegex } from './setup/common.ts';
 
 let server: Server;
 

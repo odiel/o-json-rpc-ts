@@ -1,9 +1,9 @@
 import { assertEquals } from '@std/assert';
 import type { Api, ProtocolVersion, RequestContext, ResourceContent, ResourceName, Server, WebSocketId } from '../src/index.ts';
 import { LogLevel } from '../src/index.ts';
-import { APIs, Greeting, HelloInputV1, helloV1, helloV2, procedureNames } from './procedures.ts';
+import { APIs, Greeting, HelloInputV1, helloV1, helloV2, procedureNames } from './setup/procedures.ts';
 
-import { createServer, httpRequest, serverLogger, sleep, stopServer, subscribeToResource } from './common.ts';
+import { createServer, httpRequest, serverLogger, sleep, stopServer, subscribeToResource } from './setup/common.ts';
 
 let server: Server;
 
