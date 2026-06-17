@@ -1,4 +1,4 @@
-import type { Api, ProcedureName, ProcedureRequestContext, ProcedureResult, RequestContext, Resource, ResourceName } from '../../src/index.ts';
+import type { Api, ErrorDefinition, ErrorName, ProcedureName, ProcedureRequestContext, ProcedureResult, RequestContext, ResourceDefinition, ResourceName } from '../../src/index.ts';
 import { ServerNotAuthenticated } from '../../src/index.ts';
 import { JRPCError } from '../../src/index.ts';
 
@@ -60,39 +60,48 @@ export type UserCredentialsInputTypeV1 = z.infer<typeof userCredentialsInputV1>;
 
 // Resource definition
 
-export const HelloInputV1: Resource = {
+export const HelloInputV1: ResourceDefinition = {
     name: 'HelloInput' as ResourceName,
     schema: helloInputV1,
 };
 
-export const HelloInputV2: Resource = {
+export const HelloInputV2: ResourceDefinition = {
     name: 'HelloInput' as ResourceName,
     schema: helloInputV2,
 };
 
-export const Greeting: Resource = {
+export const Greeting: ResourceDefinition = {
     name: 'Greeting' as ResourceName,
     schema: greeting,
 };
 
-export const Pong: Resource = {
+export const Pong: ResourceDefinition = {
     name: 'Pong' as ResourceName,
     schema: pong,
 };
 
-export const UserCredentials: Resource = {
+export const UserCredentials: ResourceDefinition = {
     name: 'UserCredentials' as ResourceName,
     schema: userCredentialsInputV1,
 };
 
-export const UserSession: Resource = {
+export const UserSession: ResourceDefinition = {
     name: 'UserSession' as ResourceName,
     schema: userSessionOutputV1,
 };
 
-export const UserAccount: Resource = {
+export const UserAccount: ResourceDefinition = {
     name: 'UserAccount' as ResourceName,
     schema: userAccountOutputV1,
+};
+
+// Errors definition
+export const InvalidContentError: ErrorDefinition = {
+    name: 'SERVER:INVALID_CONTENT' as ErrorName,
+    schema: z.object({
+        code: z.literal('SERVER:INVALID_CONTENT'),
+        message: z.string(),
+    }),
 };
 
 export function helloV1(

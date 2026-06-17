@@ -3,6 +3,7 @@ import type {
     AbstractLogger,
     Api,
     APIDefinition,
+    ErrorName,
     JSONSchema,
     ProcedureExecution,
     ProcedureHandlerFunction,
@@ -93,6 +94,11 @@ export class Server {
      * Registered resources per API.
      */
     private resourceDefinitions = new Map<Api, Record<ResourceName, ZodType>>();
+
+    /**
+     * Registered errors per API.
+     */
+    private errorsDefinitions = new Map<Api, Record<ErrorName, ZodType>>();
 
     /**
      * Registered procedure handlers per API.
@@ -305,6 +311,56 @@ export class Server {
     }
 
     /**
+     * Registers a resource for an API.
+     *
+     * @param api API where the resource is registered
+     * @param name Name to give to the resource
+     * @param schema Zod schema to define the resource structure
+     *
+     * @throws ServerInstanceError if the resource is already registered
+     *
+     * ```ts
+     * import { Server } from '@o-json-rpc/o-json-rpc-ts';
+     * import * as z from 'zod';
+     *
+     * const zUser = z.object({
+     *     id: z.string(),
+     *     email: z.string()
+     * });
+     *
+     * const server = new Server();
+     * server.registerError('v1', 'SERVER:', zUser);
+     * ```
+     */
+    public registerError(api: Api | string, name: ErrorName | string, schema: ZodType): Server {
+        const apiValue = api as Api;
+        const nameValue = name as ErrorName;
+
+        if (!this.errorsDefinitions.get(apiValue)) {
+            this.errorsDefinitions.set(apiValue, {});
+        }
+
+        const apiErrors = this.errorsDefinitions.get(apiValue);
+
+        if (apiErrors![nameValue]) {
+            const msg = `[${apiValue}]: error [${nameValue}] is already registered.`;
+
+            this.config.logger.error(
+                msg,
+            );
+
+            throw new ServerInstanceError(msg);
+        }
+
+        this.config.logger.debug(
+            `[${apiValue}]: registering error: ${nameValue}`,
+        );
+
+        apiErrors![nameValue] = schema;
+        return this;
+    }
+
+    /**
      * Registers a procedure handler for the API.
      *
      * @param api API where the procedure is registered
@@ -327,7 +383,7 @@ export class Server {
         api: Api | string,
         procedureName: ProcedureName | string,
         handler: ProcedureHandlerFunction,
-        options?: { input?: ResourceName | string; output?: ResourceName | string },
+        options?: { input?: ResourceName | string; output?: ResourceName | string; errors?: (ErrorName | string)[] },
     ): Server {
         const apiValue = api as Api;
         const procedureNameValue = procedureName as ProcedureName;
@@ -352,35 +408,51 @@ export class Server {
             throw new ServerInstanceError(msg);
         }
 
-        if (options?.input) {
-            const registeredResource = this.resourceDefinitions.get(apiValue);
+        const registeredResources = this.resourceDefinitions.get(apiValue);
 
+        if (options?.input) {
             const msg = `[${apiValue}]: input resource [${options.input}] for procedure [${procedureNameValue}] has not been registered yet.`;
 
-            if (!registeredResource) {
+            if (!registeredResources) {
                 this.config.logger.error(msg);
                 throw new ServerInstanceError(msg);
             }
 
-            if (!registeredResource[options.input as ResourceName]) {
+            if (!registeredResources[options.input as ResourceName]) {
                 this.config.logger.error(msg);
                 throw new ServerInstanceError(msg);
             }
         }
 
         if (options?.output) {
-            const registeredResource = this.resourceDefinitions.get(apiValue);
-
             const msg = `[${apiValue}]: output resource [${options.output}] for procedure [${procedureNameValue}] has not been registered yet.`;
 
-            if (!registeredResource) {
+            if (!registeredResources) {
                 this.config.logger.error(msg);
                 throw new ServerInstanceError(msg);
             }
 
-            if (!registeredResource[options.output as ResourceName]) {
+            if (!registeredResources[options.output as ResourceName]) {
                 this.config.logger.error(msg);
                 throw new ServerInstanceError(msg);
+            }
+        }
+
+        if (options?.errors) {
+            const registeredErrors = this.errorsDefinitions.get(apiValue);
+
+            for (const error of options.errors) {
+                const msg = `[${apiValue}]: error [${error}] used by procedure [${procedureNameValue}] has not been registered yet.`;
+
+                if (!registeredErrors) {
+                    this.config.logger.error(msg);
+                    throw new ServerInstanceError(msg);
+                }
+
+                if (!registeredErrors[error as ErrorName]) {
+                    this.config.logger.error(msg);
+                    throw new ServerInstanceError(msg);
+                }
             }
         }
 
@@ -394,6 +466,7 @@ export class Server {
             fn: handler,
             input: options?.input as ResourceName,
             output: options?.output as ResourceName,
+            errors: options?.errors,
         });
 
         return this;
@@ -666,16 +739,18 @@ export class Server {
                     {
                         input?: string;
                         output?: string;
+                        errors?: string[];
                     }
                 >;
                 subscriptions: string[];
                 resources: Record<ResourceName, JSONSchema>;
+                errors: Record<ErrorName, JSONSchema>;
             }
         > = {};
 
         for (const [version, resources] of this.resourceDefinitions) {
             if (!apis[version]) {
-                apis[version] = { procedures: {}, subscriptions: [], resources: {} };
+                apis[version] = { procedures: {}, subscriptions: [], resources: {}, errors: {} };
             }
 
             for (const [resourceName, schema] of Object.entries(resources)) {
@@ -695,9 +770,31 @@ export class Server {
             }
         }
 
+        for (const [version, errors] of this.errorsDefinitions) {
+            if (!apis[version]) {
+                apis[version] = { procedures: {}, subscriptions: [], resources: {}, errors: {} };
+            }
+
+            for (const [errorName, schema] of Object.entries(errors)) {
+                let jsonSchema: JSONSchema;
+
+                try {
+                    jsonSchema = schema.toJSONSchema();
+                } catch (e) {
+                    if (e instanceof Error) {
+                        throw new InvalidZodDefinition(errorName, e.message);
+                    }
+
+                    throw new InvalidZodDefinition(errorName);
+                }
+
+                apis[version].errors[errorName as ErrorName] = jsonSchema;
+            }
+        }
+
         for (const [version, procedures] of this.procedureHandlers) {
             if (!apis[version]) {
-                apis[version] = { procedures: {}, subscriptions: [], resources: {} };
+                apis[version] = { procedures: {}, subscriptions: [], resources: {}, errors: {} };
             }
 
             for (const [procedureName, procedure] of procedures) {
@@ -709,12 +806,20 @@ export class Server {
                 if (procedure.output) {
                     apis[version].procedures[procedureName].output = `#/resources/${procedure.output}`;
                 }
+
+                if (procedure.errors) {
+                    if (!apis[version].procedures[procedureName].errors) {
+                        apis[version].procedures[procedureName].errors = [];
+                    }
+
+                    apis[version].procedures[procedureName].errors = procedure.errors.map((errorCode) => `#/errors/${errorCode}`);
+                }
             }
         }
 
         for (const [version, subscriptions] of this.subscriptionHandlers) {
             if (!apis[version]) {
-                apis[version] = { procedures: {}, subscriptions: [], resources: {} };
+                apis[version] = { procedures: {}, subscriptions: [], resources: {}, errors: {} };
             }
 
             for (const [resource, _subscription] of subscriptions) {

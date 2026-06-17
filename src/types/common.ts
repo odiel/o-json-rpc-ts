@@ -7,6 +7,7 @@ export type Api = Branded<string, 'Api'>;
 export type ProcedureRequestId = Branded<string, 'ProcedureRequestId'>;
 export type ProcedureName = Branded<string, 'ProcedureName'>;
 export type ResourceName = Branded<string, 'ResourceName'>;
+export type ErrorName = Branded<string, 'ErrorName'>;
 export type WebSocketId = Branded<string, 'WebSocketId'>;
 
 export const ProtocolVersions = {

@@ -1,11 +1,12 @@
 import type { Json, JSONSchema } from './json.ts';
-import type { Api, ProcedureName, ProcedureRequestId, ProtocolVersion, ResourceName, WebSocketId } from './common.ts';
+import type { Api, ErrorName, ProcedureName, ProcedureRequestId, ProtocolVersion, ResourceName, WebSocketId } from './common.ts';
 import type { ZodType } from 'zod';
 import type { Authentication } from './auth.ts';
 
 export type ResourceContent = Json;
 
-export type Resource = { name: ResourceName; schema: ZodType };
+export type ResourceDefinition = { name: ResourceName; schema: ZodType };
+export type ErrorDefinition = { name: ErrorName; schema: ZodType };
 
 export type ServerRequest = {
     protocol: ProtocolVersion;
@@ -21,6 +22,7 @@ export type ProcedureRegistry = {
     fn: ProcedureHandlerFunction;
     input?: ResourceName;
     output?: ResourceName;
+    errors?: (ErrorName | string)[];
 };
 
 export type ProcedureHandlerFunction = (

@@ -12,6 +12,7 @@ import {
     HelloInputV2,
     helloV1,
     helloV2,
+    InvalidContentError,
     pingV1,
     Pong,
     ProcedureError,
@@ -40,6 +41,22 @@ Deno.test('Registering the same resource twice throws an error.', () => {
                 .registerResource(APIs.v1, HelloInputV1.name, HelloInputV1.schema)
                 .registerResource(APIs.v1, Greeting.name, Greeting.schema)
                 .registerResource(APIs.v1, Greeting.name, Greeting.schema);
+        },
+        ServerInstanceError,
+        msg,
+    );
+
+    serverLogger.assertLog(LogLevel.ERROR, msg);
+});
+
+Deno.test('Registering the same error twice throws an error.', () => {
+    const msg = `[v1]: error [SERVER:INVALID_CONTENT] is already registered.`;
+
+    assertThrows(
+        () => {
+            server
+                .registerError(APIs.v1, InvalidContentError.name, InvalidContentError.schema)
+                .registerError(APIs.v1, InvalidContentError.name, InvalidContentError.schema);
         },
         ServerInstanceError,
         msg,
@@ -102,6 +119,21 @@ Deno.test('Registering a procedure handler without first registering the output 
             server
                 .registerResource(APIs.v1, HelloInputV1.name, HelloInputV1.schema)
                 .registerProcedure(APIs.v1, procedureNames.hello, helloV1, { output: Greeting.name });
+        },
+        ServerInstanceError,
+        msg,
+    );
+
+    serverLogger.assertLog(LogLevel.ERROR, msg);
+});
+
+Deno.test('Registering a procedure handler without first registering the error it is using throws an error.', () => {
+    const msg = `[v1]: error [SERVER:INVALID_CONTENT] used by procedure [hello] has not been registered yet.`;
+
+    assertThrows(
+        () => {
+            server
+                .registerProcedure(APIs.v1, procedureNames.hello, helloV1, { errors: [InvalidContentError.name] });
         },
         ServerInstanceError,
         msg,
@@ -339,7 +371,7 @@ Deno.test(
 );
 
 Deno.test(
-    'Requesting the API definition when the server is configured with exposeDefinition: false returns error code SERVER:REQUEST_METHOD_NOT_SUPPORTED.',
+    'Requesting the API definition when the server is configured with [exposeDefinition: false] returns error code SERVER:REQUEST_METHOD_NOT_SUPPORTED.',
     async () => {
         server = new Server({
             host,
@@ -370,7 +402,8 @@ Deno.test('Requesting the API definition for a server with registered procedures
     server
         .registerResource(APIs.v1, HelloInputV1.name, HelloInputV1.schema)
         .registerResource(APIs.v1, Greeting.name, Greeting.schema)
-        .registerProcedure(APIs.v1, procedureNames.hello, helloV1, { input: HelloInputV1.name, output: Greeting.name })
+        .registerError(APIs.v1, InvalidContentError.name, InvalidContentError.schema)
+        .registerProcedure(APIs.v1, procedureNames.hello, helloV1, { input: HelloInputV1.name, output: Greeting.name, errors: [InvalidContentError.name] })
         .registerSubscription(APIs.v1, Greeting.name)
         .registerResource(APIs.v2, HelloInputV1.name, HelloInputV1.schema)
         .registerResource(APIs.v2, Greeting.name, Greeting.schema)
@@ -391,12 +424,16 @@ Deno.test('Requesting the API definition for a server with registered procedures
                     hello: {
                         input: `#/resources/${HelloInputV1.name}`,
                         output: `#/resources/${Greeting.name}`,
+                        errors: [`#/errors/${InvalidContentError.name}`],
                     },
                 },
                 subscriptions: [`#/resources/${Greeting.name}`],
                 resources: {
                     [HelloInputV1.name]: HelloInputV1.schema.toJSONSchema(),
                     [Greeting.name]: Greeting.schema.toJSONSchema(),
+                },
+                errors: {
+                    [InvalidContentError.name]: InvalidContentError.schema.toJSONSchema(),
                 },
             },
             v2: {
@@ -411,6 +448,7 @@ Deno.test('Requesting the API definition for a server with registered procedures
                     [HelloInputV1.name]: HelloInputV1.schema.toJSONSchema(),
                     [Greeting.name]: Greeting.schema.toJSONSchema(),
                 },
+                errors: {},
             },
         },
     });
