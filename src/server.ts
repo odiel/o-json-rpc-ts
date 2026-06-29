@@ -513,7 +513,7 @@ export class Server {
         }
 
         this.config.logger.debug(
-            `⚙️ ✔️ [${apiValue}]: ${procedureNameValue}(${options?.input}{}): ${options?.output ? `${options?.output}{}` : 'void'}`,
+            `⚙️ ✔️ [${apiValue}]: ${procedureNameValue}(${options?.input ? `${options?.input}{}` : ''}): ${options?.output ? `${options?.output}{}` : 'void'}`,
         );
 
         apiProcedures!.set(procedureNameValue as ProcedureName, {
