@@ -54,10 +54,10 @@ deno run --allow-net .\example.ts
 ### The result of a successful server initialization should be similar to the following logs
 
 ```shell
-[DEBUG] [2026-06-05T09:29:16.176Z] [v1]: registering procedure: hello
-[DEBUG] [2026-06-05T09:29:16.176Z] Starting server instance.
-[INFO] [2026-06-05T09:29:16.181Z] Server listening for requests on localhost:8000
-[INFO] [2026-06-05T09:29:16.181Z] APIs definition at http://localhost:8000/definition
+[DEBUG] [2026-06-05T09:29:16.176Z] ⚙️ ✔️ [v1]: hello(): void
+[DEBUG] [2026-06-05T09:29:16.176Z] 🚀 Starting server instance.
+[INFO] [2026-06-05T09:29:16.181Z] 🎧 Server listening for requests on localhost:8000
+[INFO] [2026-06-05T09:29:16.181Z] 🌐 APIs definition at http://localhost:8000/definition
 ```
 
 ### Use this JSON to send an HTTP request to http://localhost:8000 using your favorite client
