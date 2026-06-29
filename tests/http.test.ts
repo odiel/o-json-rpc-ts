@@ -12,12 +12,12 @@ import {
     HelloInputV2,
     helloV1,
     helloV2,
-    InvalidContentError,
+    InvalidContentError, Number, Numbers,
     pingV1,
     Pong,
     ProcedureError,
     procedureNames,
-    reportV2,
+    reportV2, sumNumbersV1,
 } from './setup/procedures.ts';
 
 import { assertProcedureDetails, createServer, host, httpRequest, port, serverLogger, stopServer, uuidRegex } from './setup/common.ts';
@@ -33,7 +33,7 @@ Deno.test.afterEach(async () => {
 });
 
 Deno.test('Registering the same resource twice throws an error.', () => {
-    const msg = `[v1]: resource [Greeting] is already registered.`;
+    const msg = `⚙️ ⚠️ [v1]: Greeting{} already registered.`;
 
     assertThrows(
         () => {
@@ -50,7 +50,7 @@ Deno.test('Registering the same resource twice throws an error.', () => {
 });
 
 Deno.test('Registering the same error twice throws an error.', () => {
-    const msg = `[v1]: error [SERVER:INVALID_CONTENT] is already registered.`;
+    const msg = `⛔ ⚠️ [v1]: SERVER:INVALID_CONTENT already registered.`;
 
     assertThrows(
         () => {
@@ -66,7 +66,7 @@ Deno.test('Registering the same error twice throws an error.', () => {
 });
 
 Deno.test('Registering a procedure handler without first registering the input resource in the API throws an error.', () => {
-    const msg = `[v1]: input resource [HelloInput] for procedure [hello] has not been registered yet.`;
+    const msg = `⚙️ 💥 [v1]: hello(); input resource HelloInput{} not registered.`;
 
     assertThrows(
         () => {
@@ -81,7 +81,7 @@ Deno.test('Registering a procedure handler without first registering the input r
 });
 
 Deno.test('Registering a procedure handler without first registering the input resource throws an error.', () => {
-    const msg = `[v1]: input resource [HelloInput] for procedure [hello] has not been registered yet.`;
+    const msg = `⚙️ 💥 [v1]: hello(); input resource HelloInput{} not registered.`;
 
     assertThrows(
         () => {
@@ -97,7 +97,7 @@ Deno.test('Registering a procedure handler without first registering the input r
 });
 
 Deno.test('Registering a procedure handler without first registering the output resource in the API throws an error.', () => {
-    const msg = `[v1]: output resource [Greeting] for procedure [hello] has not been registered yet.`;
+    const msg = `⚙️ 💥 [v1]: hello(); output resource Greeting{} not registered.`;
 
     assertThrows(
         () => {
@@ -112,7 +112,7 @@ Deno.test('Registering a procedure handler without first registering the output 
 });
 
 Deno.test('Registering a procedure handler without first registering the output resource throws an error.', () => {
-    const msg = `[v1]: output resource [Greeting] for procedure [hello] has not been registered yet.`;
+    const msg = `⚙️ 💥 [v1]: hello(); output resource Greeting{} not registered.`;
 
     assertThrows(
         () => {
@@ -128,7 +128,7 @@ Deno.test('Registering a procedure handler without first registering the output 
 });
 
 Deno.test('Registering a procedure handler without first registering the error it is using throws an error.', () => {
-    const msg = `[v1]: error [SERVER:INVALID_CONTENT] used by procedure [hello] has not been registered yet.`;
+    const msg = `⚙️ 💥 [v1]: hello(); error SERVER:INVALID_CONTENT not registered.`;
 
     assertThrows(
         () => {
@@ -143,7 +143,7 @@ Deno.test('Registering a procedure handler without first registering the error i
 });
 
 Deno.test('Registering a procedure handler twice throws an error.', () => {
-    const msg = `[v1]: procedure handler [hello] is already registered.`;
+    const msg = `⚙️ ⚠️ [v1]: hello() already registered.`;
 
     assertThrows(
         () => {
@@ -1965,6 +1965,39 @@ Deno.test('Asserting errors during a procedure execution are handled.', async ()
         },
         ping: {
             result: 'pong!',
+        },
+    });
+});
+
+
+Deno.test('Asserting procedure\'s input support array of values.', async () => {
+    server
+        .registerResource(APIs.v1, Numbers.name, Numbers.schema)
+        .registerResource(APIs.v1, Number.name, Number.schema)
+        .registerProcedure(APIs.v1, procedureNames.sumNumbers, sumNumbersV1, { input: Numbers.name, output: Number.name })
+        .start();
+
+    const result = await httpRequest({
+        method: 'POST',
+        body: JSON.stringify({
+            protocol: 'v1',
+            api: 'v1',
+            procedures: [
+                {
+                    id: 'sumNumbers',
+                    name: 'sumNumbers',
+                    input: [1, 2, 3],
+                },
+            ],
+        }),
+    });
+
+    assertEquals(result.status, 200);
+    assertEquals(result.response.protocol, 'v1');
+    assertEquals(result.response.api, 'v1');
+    assertEquals(result.response.procedures, {
+        sumNumbers: {
+            result: 6,
         },
     });
 });

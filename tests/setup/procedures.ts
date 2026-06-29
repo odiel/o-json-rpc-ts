@@ -21,6 +21,7 @@ export const procedureNames = {
     registerUser: 'registerUser' as ProcedureName,
     authenticateUser: 'authenticateUser' as ProcedureName,
     getAccountInformation: 'getAccountInformation' as ProcedureName,
+    sumNumbers: 'sumNumbers' as ProcedureName,
 };
 
 // ZOD types
@@ -50,6 +51,8 @@ export const userAccountOutputV1 = z.object({
     email: z.string(),
     registrationDate: z.string(),
 });
+
+export const number = z.number();
 
 // TS types
 
@@ -93,6 +96,16 @@ export const UserSession: ResourceDefinition = {
 export const UserAccount: ResourceDefinition = {
     name: 'UserAccount' as ResourceName,
     schema: userAccountOutputV1,
+};
+
+export const Numbers: ResourceDefinition = {
+    name: 'Numbers' as ResourceName,
+    schema: z.array(number),
+};
+
+export const Number: ResourceDefinition = {
+    name: 'Number' as ResourceName,
+    schema: number,
 };
 
 // Errors definition
@@ -271,6 +284,15 @@ export function getAccountInformationV1(
             registrationDate: userRegistration.registrationDate.toISOString(),
         },
     };
+}
+
+export function sumNumbersV1(
+    procedureContext: ProcedureRequestContext,
+): ProcedureResult {
+    const numbers = procedureContext.input as number[];
+    return {
+        result: numbers.reduce((acc, cv) => acc + cv, 0)
+    }
 }
 
 // Errors

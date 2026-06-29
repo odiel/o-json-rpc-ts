@@ -1,7 +1,7 @@
 import { assertEquals, assertGreaterOrEqual, assertLessOrEqual, fail } from '@std/assert';
 import { AbstractLogger, LogLevel, type ResourceName, Server } from '../../src/index.ts';
 
-export const sleepTimeoutIds: Record<number, number> = {};
+export const sleepTimeoutIds: NodeJS.Timeout[] = [];
 
 export class TestLogger extends AbstractLogger {
     public logEntries: {
@@ -218,7 +218,7 @@ export function sleep(ms: number) {
             resolve(null);
         }, ms);
 
-        sleepTimeoutIds[sleepTimeoutId] = sleepTimeoutId;
+        sleepTimeoutIds.push(sleepTimeoutId);
     });
 }
 

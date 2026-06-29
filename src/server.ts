@@ -293,7 +293,7 @@ export class Server {
         const apiResources = this.resourceDefinitions.get(apiValue);
 
         if (apiResources![nameValue]) {
-            const msg = `[${apiValue}]: resource [${nameValue}] is already registered.`;
+            const msg = `⚙️ ⚠️ [${apiValue}]: ${nameValue}{} already registered.`;
 
             this.config.logger.error(
                 msg,
@@ -303,7 +303,7 @@ export class Server {
         }
 
         this.config.logger.debug(
-            `[${apiValue}]: registering resource: ${nameValue}`,
+            `💎 ✔️ [${apiValue}]: ${nameValue}{}`,
         );
 
         apiResources![nameValue] = schema;
@@ -311,13 +311,41 @@ export class Server {
     }
 
     /**
-     * Registers a resource for an API.
+     * Registers a list of resources
+     *
+     * @param api API where the resource is registered
+     * @param resources Collection of resource names and schemas
+     *
+     * @throws ServerInstanceError if the resource is already registered
+     *
+     * ```ts
+     * import { Server } from '@o-json-rpc/o-json-rpc-ts';
+     * import * as z from 'zod';
+     *
+     * const zUser = z.object({
+     *     id: z.string(),
+     *     email: z.string()
+     * });
+     *
+     * const server = new Server();
+     * server.registerResources('v1', [{ name: 'User', schema: zUser }]);
+     */
+    public registerResources(api: Api | string, resources: { name: ResourceName | string; schema: ZodType }[]): Server {
+        for (const resource of resources) {
+            this.registerResource(api, resource.name, resource.schema);
+        }
+
+        return this;
+    }
+
+    /**
+     * Registers an Error for an API.
      *
      * @param api API where the resource is registered
      * @param name Name to give to the resource
      * @param schema Zod schema to define the resource structure
      *
-     * @throws ServerInstanceError if the resource is already registered
+     * @throws ServerInstanceError if the error is already registered
      *
      * ```ts
      * import { Server } from '@o-json-rpc/o-json-rpc-ts';
@@ -343,7 +371,7 @@ export class Server {
         const apiErrors = this.errorsDefinitions.get(apiValue);
 
         if (apiErrors![nameValue]) {
-            const msg = `[${apiValue}]: error [${nameValue}] is already registered.`;
+            const msg = `⛔ ⚠️ [${apiValue}]: ${nameValue} already registered.`;
 
             this.config.logger.error(
                 msg,
@@ -353,10 +381,38 @@ export class Server {
         }
 
         this.config.logger.debug(
-            `[${apiValue}]: registering error: ${nameValue}`,
+            `⛔ ✔️ [${apiValue}]: ${nameValue} registered.`,
         );
 
         apiErrors![nameValue] = schema;
+        return this;
+    }
+
+    /**
+     * Registers a collection of Error for an API.
+     *
+     * @param api API where the resource is registered
+     * @param errors Collection of error names and schemas
+     *
+     * @throws ServerInstanceError if the error is already registered
+     *
+     * ```ts
+     * import { Server } from '@o-json-rpc/o-json-rpc-ts';
+     * import * as z from 'zod';
+     *
+     * const zUser = z.object({
+     *     id: z.string(),
+     *     email: z.string()
+     * });
+     *
+     * const server = new Server();
+     * server.registerErrors('v1', [{ name: 'SERVER:', schema: zUser }]);
+     */
+    public registerErrors(api: Api | string, errors: { name: ErrorName | string; schema: ZodType }[]): Server {
+        for (const error of errors) {
+            this.registerError(api, error.name, error.schema);
+        }
+
         return this;
     }
 
@@ -402,7 +458,7 @@ export class Server {
         }
 
         if (apiProcedures!.get(procedureNameValue as ProcedureName)) {
-            const msg = `[${apiValue}]: procedure handler [${procedureNameValue}] is already registered.`;
+            const msg = `⚙️ ⚠️ [${apiValue}]: ${procedureNameValue}() already registered.`;
 
             this.config.logger.error(msg);
             throw new ServerInstanceError(msg);
@@ -411,7 +467,7 @@ export class Server {
         const registeredResources = this.resourceDefinitions.get(apiValue);
 
         if (options?.input) {
-            const msg = `[${apiValue}]: input resource [${options.input}] for procedure [${procedureNameValue}] has not been registered yet.`;
+            const msg = `⚙️ 💥 [${apiValue}]: ${procedureNameValue}(); input resource ${options.input}{} not registered.`;
 
             if (!registeredResources) {
                 this.config.logger.error(msg);
@@ -425,7 +481,7 @@ export class Server {
         }
 
         if (options?.output) {
-            const msg = `[${apiValue}]: output resource [${options.output}] for procedure [${procedureNameValue}] has not been registered yet.`;
+            const msg = `⚙️ 💥 [${apiValue}]: ${procedureNameValue}(); output resource ${options.output}{} not registered.`;
 
             if (!registeredResources) {
                 this.config.logger.error(msg);
@@ -442,7 +498,7 @@ export class Server {
             const registeredErrors = this.errorsDefinitions.get(apiValue);
 
             for (const error of options.errors) {
-                const msg = `[${apiValue}]: error [${error}] used by procedure [${procedureNameValue}] has not been registered yet.`;
+                const msg = `⚙️ 💥 [${apiValue}]: ${procedureNameValue}(); error ${error} not registered.`;
 
                 if (!registeredErrors) {
                     this.config.logger.error(msg);
@@ -457,7 +513,7 @@ export class Server {
         }
 
         this.config.logger.debug(
-            `[${apiValue}]: registering procedure: ${procedureNameValue}`,
+            `⚙️ ✔️ [${apiValue}]: ${procedureNameValue}(${options?.input}{}): ${options?.output ? `${options?.output}{}` : 'void'}`,
         );
 
         apiProcedures!.set(procedureNameValue as ProcedureName, {
@@ -555,7 +611,7 @@ export class Server {
         }
 
         this.config.logger.debug(
-            `[${apiValue}]: registering subscription for resource [${resourceNameValue}]`,
+            `[${apiValue}]: ${resourceNameValue}<> subscription registered.`,
         );
 
         apiSubscriptions.set(
@@ -697,22 +753,22 @@ export class Server {
         const config = this.config;
         const logger = this.config.logger;
 
-        logger.debug(`Starting server instance.`);
+        logger.debug(`🚀 Starting server instance.`);
 
         this.server = Deno.serve({
             hostname,
             port,
             onListen() {
-                logger.info(`Server listening for requests on ${hostname}:${port}`);
+                logger.info(`🎧 Server listening for requests on ${hostname}:${port}`);
 
                 if (config.exposeDefinition) {
-                    logger.info(`APIs definition at http://${hostname}:${port}/definition`);
+                    logger.info(`🌐 APIs definition at http://${hostname}:${port}/definition`);
                 }
             },
         }, handler);
 
         this.server.finished.then(() => {
-            logger.info(`Server closed.`);
+            logger.info(`🏁 Server closed.`);
         });
     }
 
@@ -1338,7 +1394,7 @@ export class Server {
     ): Promise<ProcedureExecution> {
         const timeBeforeExecution = Date.now();
         let timedOut: boolean = false;
-        let timeOutId: number | undefined;
+        let timeOutId: NodeJS.Timeout | undefined;
 
         const procedureTimeoutPromise = new Promise(
             (_, reject) => {
