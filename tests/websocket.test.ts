@@ -1,6 +1,7 @@
 import { assertEquals, assertGreaterOrEqual, assertMatch } from '@std/assert';
-import type { JRPCError, ProcedureRequestContext, ProcedureResult, RequestContext } from '../src/index.ts';
-import { Server } from '../src/index.ts';
+import type { JRPCError, ProcedureRequestContext, ProcedureResult, RequestContext, ServerRequest } from '../src/index.ts';
+import { LogLevel, ProcedureIncompatibleInput, ProcedureIncompatibleResult, Server } from '../src/index.ts';
+import type { ZodError } from 'zod';
 import {
     APIs,
     ApplicationInternalError,
@@ -861,13 +862,17 @@ Deno.test('Asserting hooks execution.', async () => {
         .registerProcedure(APIs.v2, procedureNames.ping, helloV2, { input: HelloInputV1.name, output: Greeting.name })
         .beforeAll((_context: RequestContext) => {
             hooksExecuted.beforeAll += 1;
-        }).beforeEach((_context: RequestContext) => {
+        })
+        .beforeEach((_context: RequestContext) => {
             hooksExecuted.beforeEach += 1;
-        }).afterEach((_result: ProcedureResult, _context: RequestContext) => {
+        })
+        .afterEach((_result: ProcedureResult, _context: RequestContext) => {
             hooksExecuted.afterEach += 1;
-        }).afterAll((_context: RequestContext) => {
+        })
+        .afterAll((_context: RequestContext) => {
             hooksExecuted.afterAll += 1;
-        }).start();
+        })
+        .start();
 
     const response = await websocketRequest(JSON.stringify({
         protocol: 'v1',
@@ -930,7 +935,7 @@ Deno.test('Asserting hooks execution.', async () => {
     });
 });
 
-Deno.test('Asserting unhandled errors in the [beforeAll] hook.', async () => {
+Deno.test('Asserting errors in the [beforeAll] hook are handled.', async () => {
     server
         .registerResource(APIs.v1, Pong.name, Pong.schema)
         .registerProcedure(APIs.v1, procedureNames.ping, pingV1, { output: Pong.name })
@@ -949,6 +954,8 @@ Deno.test('Asserting unhandled errors in the [beforeAll] hook.', async () => {
         ],
     }));
 
+    serverLogger.assertLog(LogLevel.ERROR, 'BeforeAll hook execution failed.');
+
     assertEquals(response.protocol, 'v1');
     assertEquals(response.api, 'v1');
     assertEquals(response.procedures, undefined);
@@ -958,7 +965,7 @@ Deno.test('Asserting unhandled errors in the [beforeAll] hook.', async () => {
     });
 });
 
-Deno.test('Asserting unhandled errors in the [afterAll] hook.', async () => {
+Deno.test('Asserting errors in the [afterAll] hook are handled.', async () => {
     server
         .registerResource(APIs.v1, Pong.name, Pong.schema)
         .registerProcedure(APIs.v1, procedureNames.ping, pingV1, { output: Pong.name })
@@ -977,6 +984,8 @@ Deno.test('Asserting unhandled errors in the [afterAll] hook.', async () => {
         ],
     }));
 
+    serverLogger.assertLog(LogLevel.ERROR, 'AfterAll hook execution failed.');
+
     assertEquals(response.protocol, 'v1');
     assertEquals(response.api, 'v1');
     assertEquals(response.procedures, undefined);
@@ -986,7 +995,7 @@ Deno.test('Asserting unhandled errors in the [afterAll] hook.', async () => {
     });
 });
 
-Deno.test('Asserting unhandled errors in the [beforeEach] hook.', async () => {
+Deno.test('Asserting errors in the [beforeEach] hook are handled.', async () => {
     server
         .registerResource(APIs.v1, Pong.name, Pong.schema)
         .registerResource(APIs.v1, HelloInputV1.name, HelloInputV1.schema)
@@ -1016,6 +1025,8 @@ Deno.test('Asserting unhandled errors in the [beforeEach] hook.', async () => {
             },
         ],
     }));
+
+    serverLogger.assertLog(LogLevel.ERROR, 'BeforeEach hook execution failed for procedure with id: hello and name: hello');
 
     assertEquals(response.protocol, 'v1');
     assertEquals(response.api, 'v1');
@@ -1063,6 +1074,8 @@ Deno.test('Asserting unhandled errors in the [afterEach] hook.', async () => {
         ],
     }));
 
+    serverLogger.assertLog(LogLevel.ERROR, 'AfterEach hook execution failed for procedure with id: ping and name: ping');
+
     assertEquals(response.protocol, 'v1');
     assertEquals(response.api, 'v1');
     assertEquals(response.procedures, {
@@ -1080,7 +1093,7 @@ Deno.test('Asserting unhandled errors in the [afterEach] hook.', async () => {
     });
 });
 
-Deno.test('Asserting unhandled errors during a procedure execution.', async () => {
+Deno.test('Asserting errors during a procedure execution are handled.', async () => {
     server
         .registerResource(APIs.v1, Pong.name, Pong.schema)
         .registerProcedure(APIs.v1, procedureNames.ping, pingV1, { output: Pong.name })
@@ -1102,6 +1115,8 @@ Deno.test('Asserting unhandled errors during a procedure execution.', async () =
         ],
     }));
 
+    serverLogger.assertLog(LogLevel.ERROR, 'Execution failed for procedure with id: fail and name: fail');
+
     assertEquals(response.protocol, 'v1');
     assertEquals(response.api, 'v1');
     assertEquals(response.procedures, {
@@ -1117,17 +1132,26 @@ Deno.test('Asserting unhandled errors during a procedure execution.', async () =
     });
 });
 
-Deno.test('Asserting errors in the [beforeAll] hook are handled.', async () => {
+Deno.test('Asserting [onServerError] is called when [beforeAll] throws an error.', async () => {
+    let onServerErrorCalled = false;
+    let onProcedureErrorCalled = false;
+
     server
         .registerResource(APIs.v1, Pong.name, Pong.schema)
         .registerProcedure(APIs.v1, procedureNames.ping, pingV1, { output: Pong.name })
         .beforeAll((_context: RequestContext) => {
             throw new Error('custom error');
-        }).onError(
-            (_error: unknown, _context: RequestContext): JRPCError => {
-                return new ApplicationInternalError();
+        })
+        .onServerError((_error: unknown, _request?: ServerRequest) => {
+            onServerErrorCalled = true;
+            return new ApplicationInternalError();
+        })
+        .onProcedureError(
+            (_error: unknown, _context: RequestContext) => {
+                onProcedureErrorCalled = true;
             },
-        ).start();
+        )
+        .start();
 
     const response = await websocketRequest(JSON.stringify({
         protocol: 'v1',
@@ -1139,6 +1163,9 @@ Deno.test('Asserting errors in the [beforeAll] hook are handled.', async () => {
             },
         ],
     }));
+
+    assertEquals(onServerErrorCalled, true);
+    assertEquals(onProcedureErrorCalled, false);
 
     assertEquals(response.protocol, 'v1');
     assertEquals(response.api, 'v1');
@@ -1149,18 +1176,26 @@ Deno.test('Asserting errors in the [beforeAll] hook are handled.', async () => {
     });
 });
 
-Deno.test('Asserting errors in the [afterAll] hook are handled.', async () => {
+Deno.test('Asserting [onServerError] is called when [afterAll] throws an error.', async () => {
+    let onServerErrorCalled = false;
+    let onProcedureErrorCalled = false;
+
     server
         .registerResource(APIs.v1, Pong.name, Pong.schema)
         .registerProcedure(APIs.v1, procedureNames.ping, pingV1, { output: Pong.name })
         .afterAll((_context: RequestContext) => {
             throw new Error('custom error');
         })
-        .onError(
-            (_error: unknown, _context: RequestContext): JRPCError => {
-                return new ApplicationInternalError();
+        .onServerError((_error: unknown, _request?: ServerRequest) => {
+            onServerErrorCalled = true;
+            return new ApplicationInternalError();
+        })
+        .onProcedureError(
+            (_error: unknown, _context: RequestContext) => {
+                onProcedureErrorCalled = true;
             },
-        ).start();
+        )
+        .start();
 
     const response = await websocketRequest(JSON.stringify({
         protocol: 'v1',
@@ -1172,6 +1207,9 @@ Deno.test('Asserting errors in the [afterAll] hook are handled.', async () => {
             },
         ],
     }));
+
+    assertEquals(onServerErrorCalled, true);
+    assertEquals(onProcedureErrorCalled, false);
 
     assertEquals(response.protocol, 'v1');
     assertEquals(response.api, 'v1');
@@ -1195,7 +1233,7 @@ Deno.test('Asserting errors in the [beforeEach] hook are handled.', async () => 
                     throw new Error('custom error');
                 }
             },
-        ).onError(
+        ).onProcedureError(
             (
                 _error: unknown,
                 _context: RequestContext,
@@ -1249,7 +1287,7 @@ Deno.test('Asserting errors in the [afterEach] hook are handled.', async () => {
                     throw new Error('custom error');
                 }
             },
-        ).onError(
+        ).onProcedureError(
             (
                 _error: unknown,
                 _context: RequestContext,
@@ -1297,7 +1335,7 @@ Deno.test('Asserting errors during a procedure execution are handled.', async ()
         .registerResource(APIs.v1, Pong.name, Pong.schema)
         .registerProcedure(APIs.v1, procedureNames.ping, pingV1, { output: Pong.name })
         .registerProcedure(APIs.v1, procedureNames.fail, failingV1)
-        .onError(
+        .onProcedureError(
             (
                 _error: unknown,
                 _context: RequestContext,
@@ -1334,6 +1372,117 @@ Deno.test('Asserting errors during a procedure execution are handled.', async ()
         },
         ping: {
             result: 'pong!',
+        },
+    });
+});
+
+Deno.test('Asserting ZodError details are exposed as a property of ProcedureIncompatibleInput.', async () => {
+    let onServerErrorCalled = false;
+    let onProcedureErrorCalled = false;
+    let zodError: ZodError;
+
+    server
+        .registerResource(APIs.v1, HelloInputV1.name, HelloInputV1.schema)
+        .registerResource(APIs.v1, Greeting.name, Greeting.schema)
+        .registerProcedure(APIs.v1, procedureNames.hello, helloV1, { input: HelloInputV1.name, output: Greeting.name })
+        .onProcedureError((error, _context, _procedureContext) => {
+            onProcedureErrorCalled = true;
+
+            if (error instanceof ProcedureIncompatibleInput) {
+                zodError = error.zodError;
+            }
+        })
+        .onServerError((_error: unknown, _request?: ServerRequest) => {
+            onServerErrorCalled = true;
+        })
+        .start();
+
+    const response = await websocketRequest(JSON.stringify({
+        protocol: 'v1',
+        api: 'v1',
+        procedures: [
+            {
+                id: 'hello',
+                name: 'hello',
+                input: [1, 2, 3],
+            },
+        ],
+    }));
+
+    assertEquals(onServerErrorCalled, false);
+    assertEquals(onProcedureErrorCalled, true);
+
+    assertEquals(zodError!.issues.length, 1);
+    assertEquals(zodError!.issues[0], {
+        expected: 'string',
+        code: 'invalid_type',
+        path: [],
+        message: 'Invalid input: expected string, received array',
+    });
+
+    assertEquals(response.protocol, 'v1');
+    assertEquals(response.api, 'v1');
+    assertEquals(response.procedures, {
+        hello: {
+            error: {
+                code: 'PROCEDURE:INCOMPATIBLE_INPUT',
+                message: 'Incompatible input content.',
+            },
+        },
+    });
+});
+
+Deno.test('Asserting ZodError details are exposed as a property of ProcedureIncompatibleResult.', async () => {
+    let onServerErrorCalled = false;
+    let onProcedureErrorCalled = false;
+    let zodError: ZodError;
+
+    server
+        .registerResource(APIs.v1, HelloInputV1.name, HelloInputV1.schema)
+        .registerProcedure(APIs.v1, procedureNames.hello, helloV1, { input: HelloInputV1.name, output: HelloInputV1.name })
+        .onProcedureError((error, _context, _procedureContext) => {
+            onProcedureErrorCalled = true;
+
+            if (error instanceof ProcedureIncompatibleResult) {
+                zodError = error.zodError;
+            }
+        })
+        .onServerError((_error: unknown, _request?: ServerRequest) => {
+            onServerErrorCalled = true;
+        })
+        .start();
+
+    const response = await websocketRequest(JSON.stringify({
+        protocol: 'v1',
+        api: 'v1',
+        procedures: [
+            {
+                id: 'hello',
+                name: 'hello',
+                input: 'World',
+            },
+        ],
+    }));
+
+    assertEquals(onServerErrorCalled, false);
+    assertEquals(onProcedureErrorCalled, true);
+
+    assertEquals(zodError!.issues.length, 1);
+    assertEquals(zodError!.issues[0], {
+        'expected': 'string',
+        'code': 'invalid_type',
+        'path': [],
+        'message': 'Invalid input: expected string, received object',
+    });
+
+    assertEquals(response.protocol, 'v1');
+    assertEquals(response.api, 'v1');
+    assertEquals(response.procedures, {
+        hello: {
+            error: {
+                code: 'PROCEDURE:INCOMPATIBLE_OUTPUT',
+                message: 'Incompatible output content.',
+            },
         },
     });
 });

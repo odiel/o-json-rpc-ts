@@ -1,4 +1,5 @@
 import type { ZodType } from 'zod';
+import { ZodError } from 'zod';
 import type {
     AbstractLogger,
     Api,
@@ -28,6 +29,7 @@ import type {
 } from './types/index.ts';
 
 import {
+    CachedErrors,
     ConsoleLogger,
     ContextCustomValues,
     Environment,
@@ -41,13 +43,8 @@ import {
     ProcedureNotFound,
     ProcedureTimeout,
     ProtocolVersions,
-    ServerIncompatibleRequestContent,
-    ServerIncompatibleResponseContent,
     ServerInstanceError,
-    ServerRequestContentTooBig,
-    ServerRequestMethodNotSupported,
     ServerUnhandledError,
-    ServerUpgradeRequestNotSupported,
     toErrorResponse,
 } from './types/index.ts';
 
@@ -174,13 +171,21 @@ export class Server {
     ) => void | Promise<void>;
 
     /**
-     * Callback function to execute when an unhandled error occurs.
+     * Callback function to execute when a server error occurs.
      */
-    private onErrorFunc?: (
+    private onServerErrorFunc?: (
+        error: unknown,
+        request?: ServerRequest,
+    ) => void | JRPCError | Promise<void | JRPCError>;
+
+    /**
+     * Callback function to execute when a procedure execution fails.
+     */
+    private onProcedureErrorFunc?: (
         error: unknown,
         context: RequestContext,
         procedureContext?: ProcedureRequestContext,
-    ) => JRPCError | Promise<JRPCError>;
+    ) => void | JRPCError | Promise<void | JRPCError>;
 
     /**
      * Class constructor.
@@ -714,25 +719,51 @@ export class Server {
     }
 
     /**
-     * Sets a callback function to be executed when an unhandled error occurs.
+     * Sets a callback function to be executed when an error occurs while processing the request.
      *
      * ```ts
      * import { Server } from '@o-json-rpc/o-json-rpc-ts';
      *
      * const server = new Server();
-     * server.afterAll((context: RequestContext) => {
-     *      console.log(context);
+     * server.onServerError((error: unknown, request: ServerRequest) => {
+     *      console.log(error);
+     *      console.log(request);
      * });
      * ```
      */
-    public onError(
+    public onServerError(
+        func: (
+            error: unknown,
+            request?: ServerRequest,
+        ) => void | JRPCError | Promise<void | JRPCError>,
+    ): Server {
+        this.onServerErrorFunc = func;
+
+        return this;
+    }
+
+    /**
+     * Sets a callback function to be executed when a procedure fails to complete its execution.
+     *
+     * ```ts
+     * import { Server } from '@o-json-rpc/o-json-rpc-ts';
+     *
+     * const server = new Server();
+     * server.onProcedureError((error: unknown, context: RequestContext, procedureContext: ProcedureRequestContext) => {
+     *      console.log(error);
+     *      console.log(context);
+     *      console.log(procedureContext);
+     * });
+     * ```
+     */
+    public onProcedureError(
         func: (
             error: unknown,
             context: RequestContext,
             procedureContext?: ProcedureRequestContext,
-        ) => JRPCError | Promise<JRPCError>,
+        ) => void | JRPCError | Promise<void | JRPCError>,
     ): Server {
-        this.onErrorFunc = func;
+        this.onProcedureErrorFunc = func;
 
         return this;
     }
@@ -916,7 +947,7 @@ export class Server {
             const response: ServerErrorResponse = {
                 protocol: this.protocolVersion,
                 api: 'unknown',
-                error: toErrorResponse(new ServerUpgradeRequestNotSupported()),
+                error: CachedErrors.ServerUpgradeRequestNotSupported,
             };
 
             return Response.json(response, { status: 501 });
@@ -949,7 +980,7 @@ export class Server {
             const response: ServerErrorResponse = {
                 protocol: this.protocolVersion,
                 api: 'unknown',
-                error: toErrorResponse(new ServerRequestMethodNotSupported()),
+                error: CachedErrors.ServerRequestMethodNotSupported,
             };
 
             return this.getHttpResponse(req, response, 405);
@@ -959,7 +990,7 @@ export class Server {
             const response: ServerErrorResponse = {
                 protocol: this.protocolVersion,
                 api: 'unknown',
-                error: toErrorResponse(new ServerIncompatibleRequestContent()),
+                error: CachedErrors.ServerIncompatibleRequestContent,
             };
 
             return this.getHttpResponse(req, response, 400);
@@ -985,7 +1016,7 @@ export class Server {
                 const response: ServerErrorResponse = {
                     protocol: this.protocolVersion,
                     api: 'unknown',
-                    error: toErrorResponse(new ServerRequestContentTooBig()),
+                    error: CachedErrors.ServerRequestContentTooBig,
                 };
 
                 return this.getHttpResponse(req, response, 400);
@@ -1006,7 +1037,7 @@ export class Server {
             const response: ServerErrorResponse = {
                 protocol: this.protocolVersion,
                 api: 'unknown',
-                error: toErrorResponse(new ServerIncompatibleRequestContent()),
+                error: CachedErrors.ServerIncompatibleRequestContent,
             };
 
             return this.getHttpResponse(req, response, 400);
@@ -1014,15 +1045,15 @@ export class Server {
 
         try {
             protocolRequestSchema.parse(request);
-        } catch (e) {
+        } catch (error) {
             const response: ServerErrorResponse = {
                 protocol: this.protocolVersion,
                 api: 'unknown',
-                error: toErrorResponse(new ServerIncompatibleRequestContent()),
+                error: CachedErrors.ServerIncompatibleRequestContent,
             };
 
             this.config.logger.error('Request failed', {
-                error: serializeError(e),
+                error: serializeError(error),
             });
 
             return this.getHttpResponse(req, response, 400);
@@ -1033,10 +1064,20 @@ export class Server {
         try {
             requestResult = await this.processRequest(request);
         } catch (e) {
-            let responseError = new ServerUnhandledError();
+            let responseError = e instanceof JRPCError ? e : new ServerUnhandledError();
 
-            if (e instanceof JRPCError) {
-                responseError = e;
+            if (this.onServerErrorFunc) {
+                let overrideError;
+
+                try {
+                    overrideError = await this.onServerErrorFunc(e, request);
+                } catch (_e: unknown) {
+                    //
+                }
+
+                if (overrideError instanceof JRPCError) {
+                    responseError = overrideError;
+                }
             }
 
             const response: ServerErrorResponse = {
@@ -1058,7 +1099,7 @@ export class Server {
             const response: ServerErrorResponse = {
                 protocol: this.protocolVersion,
                 api: 'unknown',
-                error: toErrorResponse(new ServerIncompatibleResponseContent()),
+                error: CachedErrors.ServerIncompatibleResponseContent,
             };
 
             this.config.logger.error('Response content validation failed.', {
@@ -1122,7 +1163,7 @@ export class Server {
                 const response: ServerErrorResponse = {
                     protocol: this.protocolVersion,
                     api: 'unknown',
-                    error: toErrorResponse(new ServerIncompatibleRequestContent()),
+                    error: CachedErrors.ServerIncompatibleRequestContent,
                 };
 
                 socket.send(JSON.stringify(response));
@@ -1135,7 +1176,7 @@ export class Server {
                 const response: ServerErrorResponse = {
                     protocol: this.protocolVersion,
                     api: 'unknown',
-                    error: toErrorResponse(new ServerIncompatibleRequestContent()),
+                    error: CachedErrors.ServerIncompatibleRequestContent,
                 };
 
                 socket.send(JSON.stringify(response));
@@ -1148,7 +1189,7 @@ export class Server {
                 const response: ServerErrorResponse = {
                     protocol: this.protocolVersion,
                     api: 'unknown',
-                    error: toErrorResponse(new ServerRequestContentTooBig()),
+                    error: CachedErrors.ServerRequestContentTooBig,
                 };
 
                 socket.send(JSON.stringify(response));
@@ -1163,7 +1204,7 @@ export class Server {
                 const response: ServerErrorResponse = {
                     protocol: this.protocolVersion,
                     api: 'unknown',
-                    error: toErrorResponse(new ServerIncompatibleRequestContent()),
+                    error: CachedErrors.ServerIncompatibleRequestContent,
                 };
 
                 socket.send(JSON.stringify(response));
@@ -1176,7 +1217,7 @@ export class Server {
                 const response: ServerErrorResponse = {
                     protocol: this.protocolVersion,
                     api: 'unknown',
-                    error: toErrorResponse(new ServerIncompatibleRequestContent()),
+                    error: CachedErrors.ServerIncompatibleRequestContent,
                 };
 
                 socket.send(JSON.stringify(response));
@@ -1188,23 +1229,33 @@ export class Server {
             try {
                 requestResult = await this.processRequest(request, socket);
             } catch (e) {
-                let responseError = new ServerUnhandledError();
+                let responseError = e instanceof JRPCError ? e : new ServerUnhandledError();
 
-                if (e instanceof JRPCError) {
-                    responseError = e;
+                if (this.onServerErrorFunc) {
+                    let overrideError;
+
+                    try {
+                        overrideError = await this.onServerErrorFunc(e, request);
+                    } catch (_e: unknown) {
+                        //
+                    }
+
+                    if (overrideError instanceof JRPCError) {
+                        responseError = overrideError;
+                    }
                 }
 
-                const errorResult: ServerErrorResponse = {
+                const response: ServerErrorResponse = {
                     protocol: this.protocolVersion,
                     api: request.api,
                     error: toErrorResponse(responseError),
                 };
 
-                this.config.logger.error('Request failed', {
+                this.config.logger.error('Request processing failed.', {
                     error: serializeError(responseError),
                 });
 
-                socket.send(JSON.stringify(errorResult));
+                socket.send(JSON.stringify(response));
                 return;
             }
 
@@ -1214,7 +1265,7 @@ export class Server {
                 const response: ServerErrorResponse = {
                     protocol: this.protocolVersion,
                     api: 'unknown',
-                    error: toErrorResponse(new ServerIncompatibleResponseContent()),
+                    error: CachedErrors.ServerIncompatibleResponseContent,
                 };
 
                 this.config.logger.error('Response content validation failed.', {
@@ -1270,12 +1321,6 @@ export class Server {
             await this.processSubscriptionsRequest(socket, context, subscriptions);
         }
 
-        try {
-            this.beforeAllFunc && await this.beforeAllFunc(context);
-        } catch (e) {
-            await this.processError(context, e);
-        }
-
         const procedureExecutionDetails: Record<ProcedureRequestId, {
             id: string;
             procedure: string;
@@ -1283,6 +1328,17 @@ export class Server {
             execution_time: number;
             timed_out: boolean;
         }> = {};
+
+        try {
+            this.beforeAllFunc && await this.beforeAllFunc(context);
+        } catch (e: unknown) {
+            this.config.logger.error('BeforeAll hook execution failed.', {
+                error: serializeError(e),
+                context,
+            });
+
+            throw e;
+        }
 
         if (procedures) {
             serverResponse.procedures = {};
@@ -1366,8 +1422,13 @@ export class Server {
 
         try {
             this.afterAllFunc && await this.afterAllFunc(context);
-        } catch (e) {
-            await this.processError(context, e);
+        } catch (e: unknown) {
+            this.config.logger.error('AfterAll hook execution failed.', {
+                error: serializeError(e),
+                context,
+            });
+
+            throw e;
         }
 
         if (serverResponse.details && context.request.options.return) {
@@ -1420,12 +1481,28 @@ export class Server {
             ]);
 
             timeOutId && clearTimeout(timeOutId);
-        } catch (e) {
-            if (e instanceof ProcedureTimeout) {
+        } catch (error) {
+            if (error instanceof ProcedureTimeout) {
                 timedOut = true;
             }
 
-            procedureResult = { error: toErrorResponse(e) };
+            procedureResult = { error: toErrorResponse(error) };
+
+            if (this.onProcedureErrorFunc) {
+                let overrideError: JRPCError | void | undefined = undefined;
+
+                try {
+                    overrideError = await this.onProcedureErrorFunc(error, context);
+                } catch (_e: unknown) {
+                    //
+                }
+
+                if (overrideError instanceof JRPCError) {
+                    procedureResult = {
+                        error: toErrorResponse(overrideError),
+                    };
+                }
+            }
 
             timeOutId && clearTimeout(timeOutId);
         }
@@ -1445,15 +1522,17 @@ export class Server {
     ): Promise<ProcedureResult> {
         let procedureResult: ProcedureResult;
 
+        const procedureErrorDetails = `id: ${procedureRequest.id} and name: ${procedureRequest.id}`;
+
         try {
             this.beforeEachFunc && await this.beforeEachFunc(context, procedureRequest);
-        } catch (e) {
+        } catch (error) {
             this.config.logger.error(
-                `BeforeEach hook execution failed for procedure: ${procedureRequest.name} (${procedureRequest.id}).`,
-                { error: serializeError(e) },
+                `BeforeEach hook execution failed for procedure with ${procedureErrorDetails}`,
+                { error: serializeError(error) },
             );
 
-            await this.processError(context, e, procedureRequest);
+            throw error;
         }
 
         try {
@@ -1461,15 +1540,13 @@ export class Server {
                 context,
                 procedureRequest,
             );
-        } catch (e) {
+        } catch (error) {
             this.config.logger.error(
-                `Procedure execution failed for procedure: ${procedureRequest.name} (${procedureRequest.id}).`,
-                { error: serializeError(e) },
+                `Execution failed for procedure with ${procedureErrorDetails}`,
+                { error: serializeError(error) },
             );
 
-            return {
-                error: toErrorResponse(e),
-            };
+            throw error;
         }
 
         try {
@@ -1478,13 +1555,13 @@ export class Server {
                 context,
                 procedureRequest,
             );
-        } catch (e) {
+        } catch (error) {
             this.config.logger.error(
-                `AfterEach hook execution failed for procedure: ${procedureRequest.name} (${procedureRequest.id}).`,
-                { error: serializeError(e) },
+                `AfterEach hook execution failed for procedure with ${procedureErrorDetails}`,
+                { error: serializeError(error) },
             );
 
-            await this.processError(context, e, procedureRequest);
+            throw error;
         }
 
         return procedureResult;
@@ -1512,8 +1589,12 @@ export class Server {
         if (procedureHandler.input && apiResources && apiResources[procedureHandler.input]) {
             try {
                 apiResources[procedureHandler.input].parse(procedureRequest.input);
-            } catch (_e) {
-                throw new ProcedureIncompatibleInput(procedureName);
+            } catch (e: unknown) {
+                if (e instanceof ZodError) {
+                    throw new ProcedureIncompatibleInput(procedureName, e);
+                }
+
+                throw new ServerUnhandledError(procedureName, e);
             }
         }
 
@@ -1531,23 +1612,23 @@ export class Server {
         ) {
             try {
                 apiResources[procedureHandler.output].parse(procedureResult.result);
-            } catch (_e) {
-                throw new ProcedureIncompatibleResult(procedureName);
+            } catch (e) {
+                if (e instanceof ZodError) {
+                    throw new ProcedureIncompatibleResult(procedureName, e);
+                }
+
+                throw new ServerUnhandledError(procedureName, e);
             }
         }
 
         return procedureResult;
     }
 
-    private async processError(
-        context: RequestContext,
+    private processError(
+        _context: RequestContext,
         error: unknown,
         procedureContext?: ProcedureRequestContext,
-    ): Promise<Error> {
-        if (this.onErrorFunc) {
-            throw await this.onErrorFunc(error, context, procedureContext);
-        }
-
+    ): Error {
         if (error instanceof JRPCError) {
             throw error;
         }

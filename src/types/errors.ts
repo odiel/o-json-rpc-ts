@@ -1,5 +1,6 @@
 import type { ErrorResponse } from './server.ts';
 import type { ProcedureName } from './common.ts';
+import type { ZodError } from 'zod';
 
 export class ServerInstanceError extends Error {
     constructor(
@@ -20,6 +21,7 @@ export enum ErrorCodes {
     SERVER_UPGRADE_REQUEST_NOT_SUPPORTED = 'SERVER:UPGRADE_REQUEST_NOT_SUPPORTED',
     SERVER_REQUEST_METHOD_NOT_SUPPORTED = 'SERVER:REQUEST_METHOD_NOT_SUPPORTED',
 
+    PROCEDURE_UNHANDLED_ERROR = 'PROCEDURE:UNHANDLED_ERROR',
     PROCEDURE_INCOMPATIBLE_INPUT = 'PROCEDURE:INCOMPATIBLE_INPUT',
     PROCEDURE_INCOMPATIBLE_OUTPUT = 'PROCEDURE:INCOMPATIBLE_OUTPUT',
     PROCEDURE_NOT_FOUND = 'PROCEDURE:NOT_FOUND',
@@ -36,6 +38,7 @@ export class JRPCError extends Error {
     constructor(
         public code: string,
         public override message: string,
+        public details?: Record<string, unknown>,
     ) {
         super(message);
     }
@@ -129,7 +132,7 @@ export class ServerNotAuthorized extends JRPCError {
  * Error to be thrown when the server catches a lower level unhandled error.
  */
 export class ServerUnhandledError extends JRPCError {
-    constructor(public procedureName?: string) {
+    constructor(public procedureName?: string, public error?: unknown) {
         super(
             ErrorCodes.SERVER_UNHANDLED_ERROR,
             'Unhandled error.',
@@ -141,7 +144,7 @@ export class ServerUnhandledError extends JRPCError {
  * Error to be thrown when the input content of a procedure does not match the resource schema definition.
  */
 export class ProcedureIncompatibleInput extends JRPCError {
-    constructor(public procedureName: ProcedureName) {
+    constructor(public procedureName: ProcedureName, public zodError: ZodError) {
         super(
             ErrorCodes.PROCEDURE_INCOMPATIBLE_INPUT,
             'Incompatible input content.',
@@ -153,7 +156,7 @@ export class ProcedureIncompatibleInput extends JRPCError {
  * Error to be thrown when the output content of a procedure does not match the resource schema definition.
  */
 export class ProcedureIncompatibleResult extends JRPCError {
-    constructor(public procedureName: ProcedureName) {
+    constructor(public procedureName: ProcedureName, public zodError: ZodError) {
         super(
             ErrorCodes.PROCEDURE_INCOMPATIBLE_OUTPUT,
             'Incompatible output content.',
@@ -201,7 +204,7 @@ export class ProcedureNotAuthorized extends JRPCError {
 }
 
 /**
- * Function for converting an error object to its section in the response.
+ * Maps an error object to an error response.
  */
 export function toErrorResponse(error: unknown): ErrorResponse {
     if (error instanceof JRPCError) {
@@ -216,6 +219,20 @@ export function toErrorResponse(error: unknown): ErrorResponse {
         message: 'Unhandled error.',
     };
 }
+
+export const CachedErrors: {
+    ServerRequestMethodNotSupported: ErrorResponse;
+    ServerIncompatibleRequestContent: ErrorResponse;
+    ServerIncompatibleResponseContent: ErrorResponse;
+    ServerRequestContentTooBig: ErrorResponse;
+    ServerUpgradeRequestNotSupported: ErrorResponse;
+} = {
+    ServerRequestMethodNotSupported: toErrorResponse(new ServerRequestMethodNotSupported()),
+    ServerIncompatibleRequestContent: toErrorResponse(new ServerIncompatibleRequestContent()),
+    ServerIncompatibleResponseContent: toErrorResponse(new ServerIncompatibleResponseContent()),
+    ServerRequestContentTooBig: toErrorResponse(new ServerRequestContentTooBig()),
+    ServerUpgradeRequestNotSupported: toErrorResponse(new ServerUpgradeRequestNotSupported()),
+};
 
 // Server instance errors
 

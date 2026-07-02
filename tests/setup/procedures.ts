@@ -291,8 +291,8 @@ export function sumNumbersV1(
 ): ProcedureResult {
     const numbers = procedureContext.input as number[];
     return {
-        result: numbers.reduce((acc, cv) => acc + cv, 0)
-    }
+        result: numbers.reduce((acc, cv) => acc + cv, 0),
+    };
 }
 
 // Errors

@@ -1,6 +1,6 @@
 {
     "name": "@o-json-rpc/o-json-rpc-ts",
-    "version": "0.0.8",
+    "version": "0.0.9",
     "license": "MIT",
     "exports": "./src/index.ts",
     "tasks": {
@@ -8,8 +8,8 @@
         "l": "deno lint",
         "f": "deno fmt",
         "fl": "deno fmt && deno lint",
-        "tests": "deno test --allow-net --trace-leaks",
-        "coverage": "deno task tests && deno coverage --html --exclude=\"src/clients\" --exclude=\"tests\""
+        "tests": "deno test --allow-net --trace-leaks --coverage=coverage/",
+        "coverage": "deno task tests && deno coverage --html --exclude=\"src/clients\" --exclude=\"tests\" coverage/"
     },
     "imports": {
         "@std/assert": "jsr:@std/assert@1",
