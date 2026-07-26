@@ -1,7 +1,7 @@
 import { assertEquals, assertGreaterOrEqual, assertMatch, assertThrows } from '@std/assert';
 import type { ZodError } from 'zod';
 import type { ProcedureRequestContext, ProcedureResult, RequestContext, ServerRequest } from '../src/index.ts';
-import { LogLevel, ProcedureIncompatibleInput, ProcedureIncompatibleResult, Server, ServerInstanceError } from '../src/index.ts';
+import { LogLevel, ProcedureIncompatibleInput, ProcedureIncompatibleResult, ProcedureUnhandledError, Server, ServerInstanceError } from '../src/index.ts';
 import {
     APIs,
     ApplicationInternalError,
@@ -1757,7 +1757,7 @@ Deno.test('Asserting errors during a procedure execution are handled.', async ()
     assertEquals(result.response.procedures, {
         fail: {
             error: {
-                code: 'SERVER:UNHANDLED_ERROR',
+                code: 'PROCEDURE:UNHANDLED_ERROR',
                 message: 'Unhandled error.',
             },
         },
@@ -2162,6 +2162,61 @@ Deno.test('Asserting ZodError details are exposed as a property of ProcedureInco
             error: {
                 code: 'PROCEDURE:INCOMPATIBLE_OUTPUT',
                 message: 'Incompatible output content.',
+            },
+        },
+    });
+});
+
+Deno.test('Asserting errors are exposed as a property of ServerUnhandledError when there is an unhandled procedure error.', async () => {
+    let onServerErrorCalled = false;
+    let onProcedureErrorCalled = false;
+    let procedureError: Error;
+    const error = new Error('Error message');
+
+    server
+        .registerProcedure(APIs.v1, procedureNames.hello, () => {
+            throw error;
+        })
+        .onProcedureError((error, _context, _procedureContext) => {
+            onProcedureErrorCalled = true;
+
+            if (error instanceof ProcedureUnhandledError) {
+                procedureError = error.error as Error;
+            }
+        })
+        .onServerError((_error: unknown, _request?: ServerRequest) => {
+            onServerErrorCalled = true;
+        })
+        .start();
+
+    const result = await httpRequest({
+        method: 'POST',
+        body: JSON.stringify({
+            protocol: 'v1',
+            api: 'v1',
+            procedures: [
+                {
+                    id: 'hello',
+                    name: 'hello',
+                    input: 'World',
+                },
+            ],
+        }),
+    });
+
+    assertEquals(onServerErrorCalled, false);
+    assertEquals(onProcedureErrorCalled, true);
+
+    assertEquals(procedureError!, error);
+
+    assertEquals(result.status, 200);
+    assertEquals(result.response.protocol, 'v1');
+    assertEquals(result.response.api, 'v1');
+    assertEquals(result.response.procedures, {
+        hello: {
+            error: {
+                code: 'PROCEDURE:UNHANDLED_ERROR',
+                message: 'Unhandled error.',
             },
         },
     });

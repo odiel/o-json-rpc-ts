@@ -42,6 +42,7 @@ import {
     ProcedureIncompatibleResult,
     ProcedureNotFound,
     ProcedureTimeout,
+    ProcedureUnhandledError,
     ProtocolVersions,
     ServerInstanceError,
     ServerUnhandledError,
@@ -1594,7 +1595,7 @@ export class Server {
                     throw new ProcedureIncompatibleInput(procedureName, e);
                 }
 
-                throw new ServerUnhandledError(procedureName, e);
+                throw new ProcedureUnhandledError(procedureName, e);
             }
         }
 
@@ -1617,7 +1618,7 @@ export class Server {
                     throw new ProcedureIncompatibleResult(procedureName, e);
                 }
 
-                throw new ServerUnhandledError(procedureName, e);
+                throw new ProcedureUnhandledError(procedureName, e);
             }
         }
 
@@ -1633,7 +1634,7 @@ export class Server {
             throw error;
         }
 
-        throw new ServerUnhandledError(procedureContext?.name);
+        throw new ProcedureUnhandledError(procedureContext?.name, error);
     }
 
     private async processSubscriptionsRequest(

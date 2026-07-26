@@ -204,6 +204,18 @@ export class ProcedureNotAuthorized extends JRPCError {
 }
 
 /**
+ * Error to be thrown when the server catches a lower level unhandled error.
+ */
+export class ProcedureUnhandledError extends JRPCError {
+    constructor(public procedureName?: string, public error?: unknown) {
+        super(
+            ErrorCodes.PROCEDURE_UNHANDLED_ERROR,
+            'Unhandled error.',
+        );
+    }
+}
+
+/**
  * Maps an error object to an error response.
  */
 export function toErrorResponse(error: unknown): ErrorResponse {
