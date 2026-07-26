@@ -776,8 +776,6 @@ export class Server {
         const hostname = this.config.host;
         const port = this.config.port;
 
-        this.apiDefinition = this.getAPIDefinition();
-
         const handler = (req: Request) => {
             return this.requestHandler(req);
         };
@@ -973,6 +971,10 @@ export class Server {
         if (req.method === HttpMethod.GET) {
             const url = new URL(req.url);
             if (url.pathname == '/definition' && this.config.exposeDefinition) {
+                if (!this.apiDefinition) {
+                    this.apiDefinition = this.getAPIDefinition();
+                }
+
                 return this.getHttpResponse(req, this.apiDefinition, 200);
             }
         }
